@@ -1,0 +1,27 @@
+# Node
+node_modules/
+.env
+.env.*
+dist/
+build/
+
+# React
+client/node_modules/
+client/dist/
+
+# Python
+__pycache__/
+*.pyc
+env/
+.venv/
+ml-backend/__pycache__/
+ml-backend/env/
+ml-backend/.env
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
