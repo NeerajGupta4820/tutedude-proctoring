@@ -5,32 +5,27 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server as SocketIO } from 'socket.io';
-
+import authRoutes from './routes/auth.js';
 import logRoutes from './routes/log.js';
 import reportRoutes from './routes/report.js';
-import authRoutes from './routes/auth.js';
 import meetingRoutes from './routes/meeting.js';
+import meetingSocketRoutes from './routes/meetingSocket.js';
 
 dotenv.config();
-
 const app = express();
-const httpServer = createServer(app);
-const io = new SocketIO(httpServer, { cors: { origin: '*' } });
-
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
-
 
 app.use('/api/auth', authRoutes);
 app.use('/api/meeting', meetingRoutes);
 app.use('/api/log', logRoutes);
 app.use('/api/report', reportRoutes);
 
-io.on('connection', (socket) => {
-  console.log('Socket connected:', socket.id);
-  socket.on('disconnect', () => console.log('Socket disconnected:', socket.id));
-});
+const httpServer = createServer(app);
+const io = new SocketIO(httpServer, { cors: { origin: '*' } });
+
+meetingSocketRoutes(io); // Attach meeting socket logic
 
 const PORT = process.env.PORT || 5000;
 

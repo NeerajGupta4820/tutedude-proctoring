@@ -29,12 +29,14 @@ const dummyQuestion = {
 const InterviewScreen = () => {
   const [layout, setLayout] = useState("speaker");
   const [showParticipants, setShowParticipants] = useState(false);
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  const location = useLocation();
+  // Get camera/mic state from MeetingSetup
+  const navState = location.state || {};
+  const [micOn, setMicOn] = useState(navState.micOn !== undefined ? navState.micOn : true);
+  const [camOn, setCamOn] = useState(navState.cameraOn !== undefined ? navState.cameraOn : true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [language, setLanguage] = useState("javascript");
   const [code, setCode] = useState(dummyQuestion.starterCode["javascript"]);
-  const location = useLocation();
   const [mediaStream, setMediaStream] = useState(null);
   const [alert, setAlert] = useState("");
   const [logs, setLogs] = useState([]);
@@ -59,24 +61,35 @@ const InterviewScreen = () => {
 
 
 
-  // If no stream is passed, reacquire camera/mic
+  // Acquire camera/mic only if enabled
   React.useEffect(() => {
     if (!mediaStream) {
-      navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      const constraints = {};
+      if (camOn) constraints.video = true;
+      if (micOn) constraints.audio = true;
+      if (!camOn && !micOn) {
+        setMediaStream(null);
+        if (videoRef.current) videoRef.current.srcObject = null;
+        return;
+      }
+      navigator.mediaDevices.getUserMedia(constraints)
         .then((stream) => {
           setMediaStream(stream);
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          setMediaStream(null);
+          if (videoRef.current) videoRef.current.srcObject = null;
+        });
     } else {
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
     }
     // eslint-disable-next-line
-  }, [mediaStream]);
+  }, [mediaStream, camOn, micOn]);
 
   // Toggle camera on/off
   React.useEffect(() => {
@@ -187,28 +200,44 @@ const InterviewScreen = () => {
           <div className="flex-1 flex items-center justify-center relative bg-gray-200">
             {/* Live Video + Overlay */}
             <div className="relative w-96 h-72 rounded-lg overflow-hidden shadow-lg">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted={!micOn}
-                className="absolute inset-0 w-full h-full object-cover bg-black"
-                style={{ borderRadius: 12 }}
-              />
-              {/* Overlay: bounding box (example) */}
-              <canvas
-                ref={overlayRef}
-                width={384}
-                height={288}
-                className="absolute inset-0 pointer-events-none"
-                style={{ borderRadius: 12 }}
-              />
+              {camOn ? (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted={!micOn}
+                    className="absolute inset-0 w-full h-full object-cover bg-black"
+                    style={{ borderRadius: 12 }}
+                  />
+                  {/* Overlay: bounding box (example) */}
+                  <canvas
+                    ref={overlayRef}
+                    width={384}
+                    height={288}
+                    className="absolute inset-0 pointer-events-none"
+                    style={{ borderRadius: 12 }}
+                  />
+                </>
+              ) : (
+                <div className="absolute inset-0 w-full h-full bg-gray-800 flex items-center justify-center">
+                  <span className="text-white text-4xl font-bold">Camera Off</span>
+                </div>
+              )}
               {/* Real-time alert */}
               {alert && (
                 <div className="absolute top-2 left-2 bg-red-600 text-white px-4 py-2 rounded shadow-lg text-lg animate-pulse z-20">
                   {alert}
                 </div>
               )}
+              {/* Mic status icon (top right) */}
+              <div className="absolute top-2 right-2 z-30">
+                {micOn ? (
+                  <FaMicrophone className="text-cyan-700 text-2xl" title="Mic On" />
+                ) : (
+                  <FaMicrophoneSlash className="text-red-600 text-2xl" title="Mic Off" />
+                )}
+              </div>
             </div>
 
             {/* Logs (right side) */}

@@ -30,9 +30,9 @@ const Dashboard = () => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const usersRes = await axios.get('http://localhost:5000/api/meeting/users', { headers: { Authorization: `Bearer ${token}` } });
+        const usersRes = await axios.get('https://tutedude-proctoring.onrender.com/api/meeting/users', { headers: { Authorization: `Bearer ${token}` } });
         setUsers(usersRes.data.filter(u => u.role === 'user'));
-        const meetingsRes = await axios.get('http://localhost:5000/api/meeting', { headers: { Authorization: `Bearer ${token}` } });
+        const meetingsRes = await axios.get('https://tutedude-proctoring.onrender.com/api/meeting', { headers: { Authorization: `Bearer ${token}` } });
         setMeetings(meetingsRes.data);
       } catch (err) {
         setError('Failed to fetch data');
@@ -54,11 +54,11 @@ const Dashboard = () => {
     setSuccess('');
     try {
       const token = localStorage.getItem('token');
-      await axios.post('http://localhost:5000/api/meeting', form, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post('https://tutedude-proctoring.onrender.com/api/meeting', form, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Meeting scheduled!');
       setForm({ userId: '', date: '', time: '', jobRole: '', round: '' });
       // Refresh meetings
-      const meetingsRes = await axios.get('http://localhost:5000/api/meeting', { headers: { Authorization: `Bearer ${token}` } });
+      const meetingsRes = await axios.get('https://tutedude-proctoring.onrender.com/api/meeting', { headers: { Authorization: `Bearer ${token}` } });
       setMeetings(meetingsRes.data);
     } catch (err) {
       setError('Failed to schedule meeting');
@@ -115,7 +115,7 @@ const Dashboard = () => {
           </button>
         </form>
       </div>
-      <div className="bg-white rounded-lg shadow p-6 max-w-4xl mx-auto">
+      <div className="bg-white rounded-lg shadow p-6 max-w-4xl mx-auto mb-8">
         <h2 className="text-xl font-semibold mb-4">All Meetings</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full border">
@@ -147,18 +147,46 @@ const Dashboard = () => {
                   <td className="p-2 border">{m.result}</td>
                   <td className="p-2 border">{m.rating || '-'}</td>
                   <td className="p-2 border">{m.review || '-'}</td>
-                  <td className="p-2 border">
+                  <td className="p-2 border flex flex-col gap-2 items-center">
                     <button
-                      className="bg-cyan-700 text-white px-2 py-1 rounded text-xs"
+                      className="bg-cyan-700 text-white px-2 py-1 rounded text-xs mb-1"
                       onClick={() => navigate(`/admin-end-meeting/${m._id}`)}
                     >
                       Update
+                    </button>
+                    <button
+                      className="bg-green-600 text-white px-2 py-1 rounded text-xs"
+                      onClick={() => navigate(`/interview?meetingId=${m._id}&admin=1`)}
+                    >
+                      Join as Interviewer
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Meeting Cards for Admin to Join */}
+      <div className="bg-white rounded-lg shadow p-6 max-w-4xl mx-auto">
+        <h2 className="text-xl font-semibold mb-4">Join Meeting as Interviewer</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {meetings.map(m => (
+            <div key={m._id} className="border rounded-lg p-4 flex flex-col gap-2 shadow-sm">
+              <div><span className="font-semibold">User:</span> {m.user?.name} ({m.user?.email})</div>
+              <div><span className="font-semibold">Date:</span> {m.date?.slice(0,10)}</div>
+              <div><span className="font-semibold">Time:</span> {m.time}</div>
+              <div><span className="font-semibold">Job Role:</span> {m.jobRole}</div>
+              <div><span className="font-semibold">Round:</span> {m.round}</div>
+              <button
+                className="mt-2 bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700"
+                onClick={() => navigate(`/interview?meetingId=${m._id}&admin=1`)}
+              >
+                Join as Interviewer
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </div>

@@ -18,7 +18,7 @@ const Home = () => {
       setError('');
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/meeting/next', {
+        const res = await axios.get('https://tutedude-proctoring.onrender.com/api/meeting/next', {
           headers: { Authorization: `Bearer ${token}` },
         });
         setMeeting(res.data);
@@ -50,7 +50,12 @@ const Home = () => {
       micOk = false;
     }
     if (webcamOk && micOk) {
-      navigate('/face-input');
+      // Go to InterviewFaceInput.jsx first, pass meetingId and admin as state
+      if (meeting && meeting._id) {
+        navigate('/face-input', { state: { meetingId: meeting._id, admin: 0 } });
+      } else {
+        navigate('/face-input');
+      }
     } else {
       navigate('/system-check-error');
     }

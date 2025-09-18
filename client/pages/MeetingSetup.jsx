@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useNavigate,Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 const MeetingSetup = () => {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const [stream, setStream] = useState(null);
-  const [cameraOn, setCameraOn] = useState(true);
-  const [micOn, setMicOn] = useState(true);
+  const [cameraOn, setCameraOn] = useState(false);
+  const [micOn, setMicOn] = useState(false);
   const [cameras, setCameras] = useState([]);
   const [mics, setMics] = useState([]);
   const [speakers, setSpeakers] = useState([]);
@@ -17,56 +17,122 @@ const MeetingSetup = () => {
   // Get devices
   useEffect(() => {
     const getDevices = async () => {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      setCameras(devices.filter((d) => d.kind === "videoinput"));
-      setMics(devices.filter((d) => d.kind === "audioinput"));
-      setSpeakers(devices.filter((d) => d.kind === "audiooutput"));
-      if (devices.find((d) => d.kind === "videoinput")) {
-        setSelectedCamera(devices.find((d) => d.kind === "videoinput").deviceId);
-      }
-      if (devices.find((d) => d.kind === "audioinput")) {
-        setSelectedMic(devices.find((d) => d.kind === "audioinput").deviceId);
-      }
-      if (devices.find((d) => d.kind === "audiooutput")) {
-        setSelectedSpeaker(devices.find((d) => d.kind === "audiooutput").deviceId);
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        setCameras(devices.filter((d) => d.kind === "videoinput"));
+        setMics(devices.filter((d) => d.kind === "audioinput"));
+        setSpeakers(devices.filter((d) => d.kind === "audiooutput"));
+        if (devices.find((d) => d.kind === "videoinput")) {
+          setSelectedCamera(devices.find((d) => d.kind === "videoinput").deviceId);
+        }
+        if (devices.find((d) => d.kind === "audioinput")) {
+          setSelectedMic(devices.find((d) => d.kind === "audioinput").deviceId);
+        }
+        if (devices.find((d) => d.kind === "audiooutput")) {
+          setSelectedSpeaker(devices.find((d) => d.kind === "audiooutput").deviceId);
+        }
+      } catch (err) {
+        console.error("Error enumerating devices:", err);
       }
     };
     getDevices();
   }, []);
 
-  // Start stream
+  // Start or update stream only when camera or mic is explicitly turned on
   useEffect(() => {
     const startStream = async () => {
-      if (!selectedCamera && !selectedMic) return;
-      if (stream) {
-        stream.getTracks().forEach((track) => track.stop());
+      if (!selectedCamera || !cameraOn) return; // Only start if camera is on
+      try {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+        }
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: cameraOn && selectedCamera ? { deviceId: { exact: selectedCamera } } : false,
+          audio: micOn && selectedMic ? { deviceId: { exact: selectedMic } } : false,
+        });
+        setStream(mediaStream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = mediaStream;
+        }
+      } catch (err) {
+        console.error("Error starting stream:", err);
       }
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: selectedCamera ? { exact: selectedCamera } : undefined },
-        audio: { deviceId: selectedMic ? { exact: selectedMic } : undefined },
-      });
-      videoRef.current.srcObject = mediaStream;
-      setStream(mediaStream);
     };
+
     startStream();
+
     return () => {
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
+        setStream(null);
+        if (videoRef.current) videoRef.current.srcObject = null;
       }
     };
-  }, [selectedCamera, selectedMic]);
+  }, [cameraOn, micOn, selectedCamera, selectedMic]);
 
-  const toggleCamera = () => {
-    if (stream) {
-      stream.getVideoTracks().forEach((track) => (track.enabled = !cameraOn));
-      setCameraOn(!cameraOn);
+  const toggleCamera = async () => {
+    if (stream && cameraOn) {
+      // Turn off camera
+      stream.getVideoTracks().forEach((track) => track.stop());
+      setCameraOn(false);
+      // If mic is also off, stop the entire stream
+      if (!micOn) {
+        setStream(null);
+        if (videoRef.current) videoRef.current.srcObject = null;
+      } else {
+        // Keep audio stream if mic is on
+        const audioStream = new MediaStream(stream.getAudioTracks());
+        setStream(audioStream);
+        if (videoRef.current) videoRef.current.srcObject = audioStream;
+      }
+    } else if (!cameraOn && selectedCamera) {
+      // Turn on camera
+      try {
+        const videoStream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: selectedCamera } },
+        });
+        const newStream = stream
+          ? new MediaStream([...stream.getTracks(), ...videoStream.getVideoTracks()])
+          : videoStream;
+        setStream(newStream);
+        if (videoRef.current) videoRef.current.srcObject = newStream;
+        setCameraOn(true);
+      } catch (err) {
+        console.error("Error enabling camera:", err);
+      }
     }
   };
 
-  const toggleMic = () => {
-    if (stream) {
-      stream.getAudioTracks().forEach((track) => (track.enabled = !micOn));
-      setMicOn(!micOn);
+  const toggleMic = async () => {
+    if (stream && micOn) {
+      // Turn off mic
+      stream.getAudioTracks().forEach((track) => track.stop());
+      setMicOn(false);
+      // If camera is also off, stop the entire stream
+      if (!cameraOn) {
+        setStream(null);
+        if (videoRef.current) videoRef.current.srcObject = null;
+      } else {
+        // Keep video stream if camera is on
+        const videoStream = new MediaStream(stream.getVideoTracks());
+        setStream(videoStream);
+        if (videoRef.current) videoRef.current.srcObject = videoStream;
+      }
+    } else if (!micOn && selectedMic) {
+      // Turn on mic
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: { exact: selectedMic } },
+        });
+        const newStream = stream
+          ? new MediaStream([...stream.getTracks(), ...audioStream.getAudioTracks()])
+          : audioStream;
+        setStream(newStream);
+        if (videoRef.current) videoRef.current.srcObject = newStream;
+        setMicOn(true);
+      } catch (err) {
+        console.error("Error enabling mic:", err);
+      }
     }
   };
 
@@ -85,6 +151,11 @@ const MeetingSetup = () => {
               muted
               className="absolute inset-0 w-full h-full object-cover"
             />
+            {!cameraOn && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-800 text-white">
+                Camera is off
+              </div>
+            )}
           </div>
         </div>
 
@@ -101,6 +172,7 @@ const MeetingSetup = () => {
                 onChange={(e) => setSelectedCamera(e.target.value)}
                 className="border rounded p-1 mt-1"
               >
+                <option value="">Select Camera</option>
                 {cameras.map((cam) => (
                   <option key={cam.deviceId} value={cam.deviceId}>
                     {cam.label || `Camera ${cam.deviceId}`}
@@ -110,9 +182,10 @@ const MeetingSetup = () => {
             </div>
             <button
               onClick={toggleCamera}
-              className="px-4 py-2 bg-cyan-500 text-white rounded"
+              className={`px-4 py-2 rounded ${cameraOn ? 'bg-cyan-700 text-white' : 'bg-gray-300 text-gray-700'}`}
+              disabled={!selectedCamera}
             >
-              {cameraOn ? "Turn Off" : "Turn On"}
+              {cameraOn ? 'Off' : 'On'}
             </button>
           </div>
 
@@ -125,6 +198,7 @@ const MeetingSetup = () => {
                 onChange={(e) => setSelectedMic(e.target.value)}
                 className="border rounded p-1 mt-1"
               >
+                <option value="">Select Microphone</option>
                 {mics.map((mic) => (
                   <option key={mic.deviceId} value={mic.deviceId}>
                     {mic.label || `Mic ${mic.deviceId}`}
@@ -134,9 +208,10 @@ const MeetingSetup = () => {
             </div>
             <button
               onClick={toggleMic}
-              className="px-4 py-2 bg-cyan-500 text-white rounded"
+              className={`px-4 py-2 rounded ${micOn ? 'bg-cyan-700 text-white' : 'bg-gray-300 text-gray-700'}`}
+              disabled={!selectedMic}
             >
-              {micOn ? "Mute" : "Unmute"}
+              {micOn ? 'Off' : 'On'}
             </button>
           </div>
 
@@ -148,6 +223,7 @@ const MeetingSetup = () => {
               onChange={(e) => setSelectedSpeaker(e.target.value)}
               className="border rounded p-1 mt-1 w-full"
             >
+              <option value="">Select Speaker</option>
               {speakers.map((spk) => (
                 <option key={spk.deviceId} value={spk.deviceId}>
                   {spk.label || `Speaker ${spk.deviceId}`}
@@ -156,20 +232,26 @@ const MeetingSetup = () => {
             </select>
           </div>
 
-            <div className="space-y-3 mt-10">
-                <button
-                  className="bg-cyan-700 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-white hover:text-cyan-700 border-2 border-cyan-700 transition"
-                  size="lg"
-                  onClick={() => {
-                    navigate('/interview');
-                  }}
-                >
-                  Join Meeting
-                </button>
-                <p className="text-xs text-center text-muted-foreground">
-                  Do not worry, our team is super friendly! We want you to succeed. 🎉
-                </p>
-            </div>
+          <div className="space-y-3 mt-10">
+            <button
+              className="bg-cyan-700 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-white hover:text-cyan-700 border-2 border-cyan-700 transition"
+              onClick={() => {
+                navigate('/interview', {
+                  state: {
+                    cameraOn,
+                    micOn,
+                    selectedCamera,
+                    selectedMic,
+                  },
+                });
+              }}
+            >
+              Join Meeting
+            </button>
+            <p className="text-xs text-center text-muted-foreground">
+              Do not worry, our team is super friendly! We want you to succeed. 🎉
+            </p>
+          </div>
         </div>
       </div>
     </div>
