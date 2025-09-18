@@ -1,12 +1,8 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaThLarge, FaUserFriends, FaUser, FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaCog, FaSignOutAlt, FaChevronLeft } from "react-icons/fa";
+import { AuthContext } from "../components/AuthContext"; // Import AuthContext
 import CodeEditor from "../components/CodeEditor";
-
-const participants = [
-  { id: 1, name: "Alice", avatar: <FaUser /> },
-  { id: 2, name: "Bob", avatar: <FaUser /> },
-];
 
 const dummyQuestion = {
   title: "Reverse a String",
@@ -24,16 +20,14 @@ const dummyQuestion = {
   },
 };
 
-
-
 const InterviewScreen = () => {
+  const { user } = useContext(AuthContext); // Get user details
   const [layout, setLayout] = useState("speaker");
   const [showParticipants, setShowParticipants] = useState(false);
   const location = useLocation();
-  // Get camera/mic state from MeetingSetup
   const navState = location.state || {};
-  const [micOn, setMicOn] = useState(navState.micOn !== undefined ? navState.micOn : true);
-  const [camOn, setCamOn] = useState(navState.cameraOn !== undefined ? navState.cameraOn : true);
+  const [micOn, setMicOn] = useState(navState.micOn !== undefined ? navState.micOn : false);
+  const [camOn, setCamOn] = useState(navState.cameraOn !== undefined ? navState.cameraOn : false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [language, setLanguage] = useState("javascript");
   const [code, setCode] = useState(dummyQuestion.starterCode["javascript"]);
@@ -43,12 +37,20 @@ const InterviewScreen = () => {
   const [recording, setRecording] = useState(false);
   const [recorder, setRecorder] = useState(null);
   const [chunks, setChunks] = useState([]);
+  const [permissionError, setPermissionError] = useState("");
   const videoRef = useRef(null);
   const overlayRef = useRef(null);
   const navigate = useNavigate();
 
+  // Dynamic participants including the admin
+  const participants = [
+    { id: user?._id || "admin", name: user?.name || "Admin", avatar: <FaUser /> },
+    { id: 1, name: "Alice", avatar: <FaUser /> },
+    { id: 2, name: "Bob", avatar: <FaUser /> },
+  ];
+
   // Block browser back/forward navigation
-  React.useEffect(() => {
+  useEffect(() => {
     const handlePopState = (e) => {
       window.history.pushState(null, '', window.location.pathname);
     };
@@ -59,58 +61,114 @@ const InterviewScreen = () => {
     };
   }, []);
 
-
-
   // Acquire camera/mic only if enabled
-  React.useEffect(() => {
-    if (!mediaStream) {
-      const constraints = {};
-      if (camOn) constraints.video = true;
-      if (micOn) constraints.audio = true;
+  useEffect(() => {
+    const startStream = async () => {
       if (!camOn && !micOn) {
         setMediaStream(null);
         if (videoRef.current) videoRef.current.srcObject = null;
         return;
       }
-      navigator.mediaDevices.getUserMedia(constraints)
-        .then((stream) => {
-          setMediaStream(stream);
-          if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-          }
-        })
-        .catch(() => {
-          setMediaStream(null);
-          if (videoRef.current) videoRef.current.srcObject = null;
+      try {
+        const constraints = {};
+        if (camOn) constraints.video = true;
+        if (micOn) constraints.audio = true;
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        setMediaStream(stream);
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setPermissionError("");
+      } catch (err) {
+        console.error("Error accessing media devices:", err);
+        setMediaStream(null);
+        if (videoRef.current) videoRef.current.srcObject = null;
+        setPermissionError("Camera/mic access denied. Please enable permissions in your browser settings.");
+      }
+    };
+
+    startStream();
+
+    return () => {
+      if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        setMediaStream(null);
+        if (videoRef.current) videoRef.current.srcObject = null;
+      }
+    };
+  }, [camOn, micOn]);
+
+  // Toggle camera with flash effect
+  const toggleCamera = async () => {
+    if (mediaStream && camOn) {
+      // Turn off camera
+      mediaStream.getVideoTracks().forEach(track => track.stop());
+      setCamOn(false);
+      if (!micOn) {
+        setMediaStream(null);
+        if (videoRef.current) videoRef.current.srcObject = null;
+      } else {
+        const audioStream = new MediaStream(mediaStream.getAudioTracks());
+        setMediaStream(audioStream);
+        if (videoRef.current) videoRef.current.srcObject = audioStream;
+      }
+    } else if (!camOn) {
+      try {
+        // Flash effect
+        const flashStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        setTimeout(() => {
+          flashStream.getVideoTracks().forEach(track => track.stop());
+        }, 500);
+        // Start actual stream
+        const newStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: micOn,
         });
-    } else {
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+        setMediaStream(newStream);
+        if (videoRef.current) videoRef.current.srcObject = newStream;
+        setCamOn(true);
+        setPermissionError("");
+      } catch (err) {
+        console.error("Error enabling camera:", err);
+        setPermissionError("Camera access denied. Please enable permissions in your browser settings.");
       }
     }
-    // eslint-disable-next-line
-  }, [mediaStream, camOn, micOn]);
+  };
 
-  // Toggle camera on/off
-  React.useEffect(() => {
-    if (!mediaStream) return;
-    mediaStream.getVideoTracks().forEach(track => {
-      track.enabled = camOn;
-    });
-  }, [camOn, mediaStream]);
-
-  // Toggle mic on/off
-  React.useEffect(() => {
-    if (!mediaStream) return;
-    mediaStream.getAudioTracks().forEach(track => {
-      track.enabled = micOn;
-    });
-  }, [micOn, mediaStream]);
+  // Toggle mic
+  const toggleMic = async () => {
+    if (mediaStream && micOn) {
+      // Turn off mic
+      mediaStream.getAudioTracks().forEach(track => track.stop());
+      setMicOn(false);
+      if (!camOn) {
+        setMediaStream(null);
+        if (videoRef.current) videoRef.current.srcObject = null;
+      } else {
+        const videoStream = new MediaStream(mediaStream.getVideoTracks());
+        setMediaStream(videoStream);
+        if (videoRef.current) videoRef.current.srcObject = videoStream;
+      }
+    } else if (!micOn) {
+      try {
+        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const newStream = mediaStream
+          ? new MediaStream([...mediaStream.getTracks(), ...audioStream.getAudioTracks()])
+          : audioStream;
+        setMediaStream(newStream);
+        if (videoRef.current) videoRef.current.srcObject = newStream;
+        setMicOn(true);
+        setPermissionError("");
+      } catch (err) {
+        console.error("Error enabling mic:", err);
+        setPermissionError("Microphone access denied. Please enable permissions in your browser settings.");
+      }
+    }
+  };
 
   // Overlay: Example bounding box and logs (simulate real-time alerts)
-  React.useEffect(() => {
+  useEffect(() => {
     if (!mediaStream) return;
-    // Simulate alerts every 10s
     const interval = setInterval(() => {
       const alerts = [
         { type: "Not Focused", color: "red" },
@@ -132,7 +190,7 @@ const InterviewScreen = () => {
   }, [mediaStream]);
 
   // Start/stop recording
-  React.useEffect(() => {
+  useEffect(() => {
     if (mediaStream && !recorder && recording) {
       const mediaRecorder = new window.MediaRecorder(mediaStream, { mimeType: 'video/webm' });
       setRecorder(mediaRecorder);
@@ -140,10 +198,8 @@ const InterviewScreen = () => {
         if (e.data.size > 0) setChunks((prev) => [...prev, e.data]);
       };
       mediaRecorder.onstop = async () => {
-        // Send video to backend
         const blob = new Blob(chunks, { type: 'video/webm' });
         setChunks([]);
-        // Example: send to backend
         const formData = new FormData();
         formData.append('video', blob, 'interview.webm');
         try {
@@ -159,14 +215,14 @@ const InterviewScreen = () => {
       recorder.stop();
       setRecorder(null);
     }
-    // eslint-disable-next-line
   }, [recording, mediaStream]);
-
 
   // Stop camera/mic stream on leave
   const stopMedia = () => {
     if (mediaStream) {
       mediaStream.getTracks().forEach(track => track.stop());
+      setMediaStream(null);
+      if (videoRef.current) videoRef.current.srcObject = null;
     }
     if (recorder && recorder.state === 'recording') {
       recorder.stop();
@@ -174,14 +230,13 @@ const InterviewScreen = () => {
   };
 
   // Update code when language changes
-  React.useEffect(() => {
+  useEffect(() => {
     setCode(dummyQuestion.starterCode[language] || "");
   }, [language]);
 
   // Editor area width
   const editorWidth = editorOpen ? "flex-1" : "w-0";
   const videoWidth = editorOpen ? "md:w-2/5" : "w-full";
-
 
   // Leave call handler
   const handleLeave = () => {
@@ -190,17 +245,25 @@ const InterviewScreen = () => {
     navigate("/EndMeeting");
   };
 
+  // Generate avatar initials
+  const getInitials = (name) => {
+    if (!name) return "A";
+    const words = name.split(" ");
+    return words.length > 1
+      ? `${words[0][0]}${words[1][0]}`.toUpperCase()
+      : words[0][0].toUpperCase();
+  };
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
       <div className="flex flex-1 relative">
         {/* Video/Participants/Controls */}
-        <div className={`relative flex flex-col bg-white -r transition-all duration-300 ${videoWidth}`}> 
+        <div className={`relative flex flex-col bg-white transition-all duration-300 ${videoWidth}`}>
           {/* Video Layout */}
           <div className="flex-1 flex items-center justify-center relative bg-gray-200">
             {/* Live Video + Overlay */}
             <div className="relative w-96 h-72 rounded-lg overflow-hidden shadow-lg">
-              {camOn ? (
+              {camOn && !permissionError ? (
                 <>
                   <video
                     ref={videoRef}
@@ -210,7 +273,6 @@ const InterviewScreen = () => {
                     className="absolute inset-0 w-full h-full object-cover bg-black"
                     style={{ borderRadius: 12 }}
                   />
-                  {/* Overlay: bounding box (example) */}
                   <canvas
                     ref={overlayRef}
                     width={384}
@@ -221,7 +283,19 @@ const InterviewScreen = () => {
                 </>
               ) : (
                 <div className="absolute inset-0 w-full h-full bg-gray-800 flex items-center justify-center">
-                  <span className="text-white text-4xl font-bold">Camera Off</span>
+                  {permissionError ? (
+                    <div className="text-white text-center p-4">
+                      <p>{permissionError}</p>
+                      <p className="text-sm mt-2">Go to your browser settings to allow camera and mic access.</p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center flex-col text-white">
+                      <div className="w-16 h-16 bg-cyan-700 rounded-full flex items-center justify-center text-2xl">
+                        {getInitials(user?.name)}
+                      </div>
+                      <span className="mt-2">{user?.name || "Admin"}</span>
+                    </div>
+                  )}
                 </div>
               )}
               {/* Real-time alert */}
@@ -295,16 +369,16 @@ const InterviewScreen = () => {
             <div className="flex items-center gap-2 flex-wrap justify-center px-4">
               {/* Mic Toggle */}
               <button
-                onClick={() => setMicOn((v) => !v)}
-                className={`p-3 rounded-full  ${micOn ? "bg-cyan-700 text-white" : "bg-gray-200 text-gray-500"}`}
+                onClick={toggleMic}
+                className={`p-3 rounded-full ${micOn ? "bg-cyan-700 text-white" : "bg-gray-200 text-gray-500"}`}
                 title={micOn ? "Mute Mic" : "Unmute Mic"}
               >
                 {micOn ? <FaMicrophone /> : <FaMicrophoneSlash />}
               </button>
               {/* Cam Toggle */}
               <button
-                onClick={() => setCamOn((v) => !v)}
-                className={`p-3 rounded-full  ${camOn ? "bg-cyan-700 text-white" : "bg-gray-200 text-gray-500"}`}
+                onClick={toggleCamera}
+                className={`p-3 rounded-full ${camOn ? "bg-cyan-700 text-white" : "bg-gray-200 text-gray-500"}`}
                 title={camOn ? "Turn Off Camera" : "Turn On Camera"}
               >
                 {camOn ? <FaVideo /> : <FaVideoSlash />}
@@ -312,7 +386,7 @@ const InterviewScreen = () => {
               {/* Layout Switch */}
               <button
                 onClick={() => setLayout(layout === "grid" ? "speaker" : "grid")}
-                className="p-3 rounded-full  bg-gray-200 text-gray-700 hover:bg-cyan-100"
+                className="p-3 rounded-full bg-gray-200 text-gray-700 hover:bg-cyan-100"
                 title="Switch Layout"
               >
                 <FaThLarge />
@@ -320,21 +394,21 @@ const InterviewScreen = () => {
               {/* Show Participants */}
               <button
                 onClick={() => setShowParticipants((v) => !v)}
-                className="p-3 rounded-full  bg-gray-200 text-gray-700 hover:bg-cyan-100"
+                className="p-3 rounded-full bg-gray-200 text-gray-700 hover:bg-cyan-100"
                 title="Show Participants"
               >
                 <FaUserFriends />
               </button>
               {/* Settings */}
               <button
-                className="p-3 rounded-full  bg-gray-200 text-gray-700 hover:bg-cyan-100"
+                className="p-3 rounded-full bg-gray-200 text-gray-700 hover:bg-cyan-100"
                 title="Settings"
               >
                 <FaCog />
               </button>
               {/* Leave/End Call */}
               <button
-                className="p-3 rounded-full  bg-red-600 text-white hover:bg-red-700"
+                className="p-3 rounded-full bg-red-600 text-white hover:bg-red-700"
                 title="Leave"
                 onClick={handleLeave}
               >
