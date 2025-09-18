@@ -156,7 +156,7 @@ const Dashboard = () => {
                     </button>
                     <button
                       className="bg-green-600 text-white px-2 py-1 rounded text-xs"
-                      onClick={() => navigate(`/interview?meetingId=${m._id}`)}
+                      onClick={() => navigate(`/interview?meetingId=${m._id}&admin=1`)}
                     >
                       Join as Interviewer
                     </button>
@@ -181,7 +181,7 @@ const Dashboard = () => {
               <div><span className="font-semibold">Round:</span> {m.round}</div>
               <button
                 className="mt-2 bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700"
-                onClick={() => navigate(`/interview?meetingId=${m._id}`)}
+                onClick={() => navigate(`/interview?meetingId=${m._id}&admin=1`)}
               >
                 Join as Interviewer
               </button>

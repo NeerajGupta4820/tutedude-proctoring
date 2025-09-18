@@ -46,6 +46,16 @@ export const getAllMeetings = async (req, res) => {
   }
 };
 
+export const getMeeting = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const meeting = await Meeting.findById(id);
+    res.json(meeting);  
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch meetings', error: error.message });
+  }
+};
+
 // Admin: Update meeting (rating, review, result, attended)
 export const updateMeeting = async (req, res) => {
   try {
@@ -108,10 +118,28 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
+// In-memory store for code editor visibility per meeting
+const editorOpenStore = {};
+
+// Set code editor open status for a meeting
+export const setEditorOpen = (req, res) => {
+  const meetingId = req.params.id;
+  const { open } = req.body;
+  editorOpenStore[meetingId] = !!open;
+  res.json({ meetingId, open: editorOpenStore[meetingId] });
+};
+
+// Get code editor open status for a meeting
+export const getEditorOpen = (req, res) => {
+  const meetingId = req.params.id;
+  res.json({ meetingId, open: !!editorOpenStore[meetingId] });
+};
 export default {
   createMeeting,
   getAllMeetings,
   updateMeeting,
   getNextMeeting,
   getAllUsers,
+  getMeeting,
+  setEditorOpen
 };

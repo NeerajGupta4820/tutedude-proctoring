@@ -30,6 +30,7 @@ const InterviewScreen = () => {
   const [micOn, setMicOn] = useState(navState.micOn !== undefined ? navState.micOn : false);
   const [camOn, setCamOn] = useState(navState.cameraOn !== undefined ? navState.cameraOn : false);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorUnlockedForUser, setEditorUnlockedForUser] = useState(false);
   const [language, setLanguage] = useState('javascript');
   const [code, setCode] = useState(dummyQuestion.starterCode['javascript']);
   const [mediaStream, setMediaStream] = useState(null);
@@ -414,7 +415,16 @@ const InterviewScreen = () => {
   const handleLeave = () => {
     setRecording(false);
     stopMedia();
-    navigate('/EndMeeting');
+    if (user.role === 'admin') {
+      // If admin, pass meeting data to AdminEndMeeting page
+      const meetingData = {
+        meetingId,
+        // You can add more meeting info here if available in InterviewScreen
+      };
+      navigate(`/admin-end-meeting/${meetingId}`, { state: { meeting: meetingData } });
+    } else {
+      navigate('/endmeeting', { state: { meetingId } });
+    }
   };
 
   // Get initials
@@ -565,13 +575,18 @@ const InterviewScreen = () => {
             )}
 
             {!editorOpen && (
-              <button
-                className="absolute top-8 right-4 z-30 p-2 rounded-full bg-cyan-700 text-white hover:bg-cyan-800 shadow"
-                onClick={() => setEditorOpen(true)}
-                title="Open Code Editor"
-              >
-                <FaChevronLeft className="rotate-180" />
-              </button>
+              ((user.role === 'admin' || editorUnlockedForUser) && (
+                <button
+                  className="absolute top-8 right-4 z-30 p-2 rounded-full bg-cyan-700 text-white hover:bg-cyan-800 shadow"
+                  onClick={() => {
+                    setEditorOpen(true);
+                    if (user.role === 'admin') setEditorUnlockedForUser(true);
+                  }}
+                  title="Open Code Editor"
+                >
+                  <FaChevronLeft className="rotate-180" />
+                </button>
+              ))
             )}
           </div>
 
