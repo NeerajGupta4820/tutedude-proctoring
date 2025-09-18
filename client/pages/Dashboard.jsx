@@ -30,9 +30,9 @@ const Dashboard = () => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
-        const usersRes = await axios.get('https://tutedude-proctoring.onrender.com/api/meeting/users', { headers: { Authorization: `Bearer ${token}` } });
+        const usersRes = await axios.get('http://localhost:5000/api/meeting/users', { headers: { Authorization: `Bearer ${token}` } });
         setUsers(usersRes.data.filter(u => u.role === 'user'));
-        const meetingsRes = await axios.get('https://tutedude-proctoring.onrender.com/api/meeting', { headers: { Authorization: `Bearer ${token}` } });
+        const meetingsRes = await axios.get('http://localhost:5000/api/meeting', { headers: { Authorization: `Bearer ${token}` } });
         setMeetings(meetingsRes.data);
       } catch (err) {
         setError('Failed to fetch data');
@@ -54,11 +54,11 @@ const Dashboard = () => {
     setSuccess('');
     try {
       const token = localStorage.getItem('token');
-      await axios.post('https://tutedude-proctoring.onrender.com/api/meeting', form, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post('http://localhost:5000/api/meeting', form, { headers: { Authorization: `Bearer ${token}` } });
       setSuccess('Meeting scheduled!');
       setForm({ userId: '', date: '', time: '', jobRole: '', round: '' });
       // Refresh meetings
-      const meetingsRes = await axios.get('https://tutedude-proctoring.onrender.com/api/meeting', { headers: { Authorization: `Bearer ${token}` } });
+      const meetingsRes = await axios.get('http://localhost:5000/api/meeting', { headers: { Authorization: `Bearer ${token}` } });
       setMeetings(meetingsRes.data);
     } catch (err) {
       setError('Failed to schedule meeting');
@@ -156,7 +156,7 @@ const Dashboard = () => {
                     </button>
                     <button
                       className="bg-green-600 text-white px-2 py-1 rounded text-xs"
-                      onClick={() => navigate(`/interview?meetingId=${m._id}&admin=1`)}
+                      onClick={() => navigate(`/interview?meetingId=${m._id}`)}
                     >
                       Join as Interviewer
                     </button>
@@ -181,7 +181,7 @@ const Dashboard = () => {
               <div><span className="font-semibold">Round:</span> {m.round}</div>
               <button
                 className="mt-2 bg-green-600 text-white px-4 py-2 rounded font-semibold hover:bg-green-700"
-                onClick={() => navigate(`/interview?meetingId=${m._id}&admin=1`)}
+                onClick={() => navigate(`/interview?meetingId=${m._id}`)}
               >
                 Join as Interviewer
               </button>

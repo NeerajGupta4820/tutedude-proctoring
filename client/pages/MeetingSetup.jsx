@@ -236,12 +236,15 @@ const MeetingSetup = () => {
             <button
               className="bg-cyan-700 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-white hover:text-cyan-700 border-2 border-cyan-700 transition"
               onClick={() => {
-                navigate('/interview', {
+                // Pass meetingId if available in location.state or query
+                const meetingId = localStorage.getItem('meetingId');
+                navigate('/interview' + (meetingId ? `?meetingId=${meetingId}` : ''), {
                   state: {
                     cameraOn,
                     micOn,
                     selectedCamera,
                     selectedMic,
+                    meetingId,
                   },
                 });
               }}

@@ -5,7 +5,10 @@ const useSocket = (url) => {
   const socketRef = useRef();
 
   useEffect(() => {
-    socketRef.current = io(url);
+    socketRef.current = io(url, {
+      transports: ['websocket'],
+      withCredentials: true
+    });
     return () => {
       socketRef.current.disconnect();
     };
