@@ -436,9 +436,9 @@ const InterviewScreen = () => {
       <div className="flex flex-1 relative">
         <div className={`relative flex flex-col bg-white transition-all duration-300 ${editorOpen ? 'md:w-2/5' : 'w-full'}`}>
           <div className="flex-1 flex items-center justify-center relative bg-gray-200">
-            <div className="relative w-full h-full grid grid-cols-2 gap-4 p-4">
+            <div className="relative w-full h-full grid grid-cols-2 gap-4 p-4 items-center">
               {/* Local Video */}
-              <div className="relative w-full h-72 rounded-lg overflow-hidden shadow-lg">
+              <div className="relative w-full h-[28rem] rounded-2xl overflow-hidden shadow-xl border border-gray-200 bg-gray-900 flex flex-col justify-center items-center">
                 {camOn && !permissionError ? (
                   <>
                     <video
@@ -495,7 +495,7 @@ const InterviewScreen = () => {
               {participants
                 .filter(p => p.id !== user.id)
                 .map(p => (
-                  <div key={p.socketId} className="relative w-full h-72 rounded-lg overflow-hidden shadow-lg">
+                  <div key={p.socketId} className="relative w-full h-[28rem] rounded-2xl overflow-hidden shadow-xl border border-gray-200 bg-gray-900 flex flex-col justify-center items-center">
                     {p.stream ? (
                       <>
                         <video
@@ -524,7 +524,7 @@ const InterviewScreen = () => {
             </div>
 
             {/* Logs */}
-            <div className="absolute right-2 top-2 w-56 bg-white/90 rounded shadow p-2 z-10 max-h-60 overflow-y-auto">
+            {/* <div className="absolute right-2 top-2 w-56 bg-white/90 rounded shadow p-2 z-10 max-h-60 overflow-y-auto">
               <div className="font-bold text-cyan-700 mb-1">Logs</div>
               <ul className="text-xs text-gray-700 space-y-1">
                 {logs.map((log, i) => (
@@ -533,7 +533,7 @@ const InterviewScreen = () => {
                   </li>
                 ))}
               </ul>
-            </div>
+            </div> */}
 
             {/* Record/Stop Button */}
             <button
@@ -566,7 +566,7 @@ const InterviewScreen = () => {
 
             {!editorOpen && (
               <button
-                className="absolute top-4 right-4 z-30 p-2 rounded-full bg-cyan-700 text-white hover:bg-cyan-800 shadow"
+                className="absolute top-8 right-4 z-30 p-2 rounded-full bg-cyan-700 text-white hover:bg-cyan-800 shadow"
                 onClick={() => setEditorOpen(true)}
                 title="Open Code Editor"
               >
