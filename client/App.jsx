@@ -12,7 +12,7 @@ import Signup from './pages/Signup';
 import EndMeeting from './pages/EndMeeting';
 import { AuthProvider, AuthContext } from './components/AuthContext';
 import AdminEndMeeting from './pages/admin/AdminEndMeeting';
-import Dashboard from './pages/admin/Dashboard';
+import AdminDashboard from './pages/admin/AdminDashboard';
 
 
 
@@ -33,7 +33,7 @@ const App = () => (
           path="/dashboard"
           element={
             <ProtectedRoute adminOnly={true}>
-              <Dashboard />
+              <AdminDashboard />
             </ProtectedRoute>
           }
         />
