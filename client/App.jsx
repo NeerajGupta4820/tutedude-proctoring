@@ -11,8 +11,8 @@ import MeetingSetup from './pages/MeetingSetup';
 import Signup from './pages/Signup';
 import EndMeeting from './pages/EndMeeting';
 import { AuthProvider, AuthContext } from './components/AuthContext';
-import AdminEndMeeting from './pages/AdminEndMeeting';
-import Dashboard from './pages/Dashboard';
+import AdminEndMeeting from './pages/admin/AdminEndMeeting';
+import Dashboard from './pages/admin/Dashboard';
 
 
 

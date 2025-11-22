@@ -1,5 +1,4 @@
 import express from 'express';
-import mongoose from 'mongoose';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
@@ -9,9 +8,14 @@ import authRoutes from './routes/auth.js';
 import logRoutes from './routes/log.js';
 import reportRoutes from './routes/report.js';
 import meetingRoutes from './routes/meeting.js';
+import questionRoutes from './routes/question.js';
+import connectDB from './db/dbconfig.js';
+import { ApiError } from './middleware/errorHandler.js';
 
 dotenv.config();
+
 const app = express();
+
 app.use(helmet());
 app.use(cors({
   origin: 'http://localhost:3000',
@@ -21,10 +25,23 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api/meeting', meetingRoutes);
+app.use('/api/question', questionRoutes);
 app.use('/api/log', logRoutes);
 app.use('/api/report', reportRoutes);
 
+// Error handler
+app.use((err, req, res, next) => {
+  const statusCode = err.statusCode || 500;
+  res.status(statusCode).json({
+    success: false,
+    statusCode,
+    message: err.message || 'Internal Server Error',
+    errors: err.errors || [],
+  });
+});
+
 const PORT = process.env.PORT || 5000;
+
 const httpServer = http.createServer(app);
 const io = new SocketIO(httpServer, {
   cors: {
@@ -34,14 +51,14 @@ const io = new SocketIO(httpServer, {
   },
 });
 
-// Interview room logic
 const interviewRooms = {};
 
 io.on('connection', (socket) => {
-  console.log(`Socket connected: ${socket.id}`);
+  console.log(`✅ Socket connected: ${socket.id}`);
+  
   socket.on('joinInterview', ({ meetingId, user }) => {
     if (!user.id) {
-      console.error('Invalid user, missing id:', user);
+      console.error('❌ Invalid user, missing id:', user);
       return;
     }
     socket.join(meetingId);
@@ -50,7 +67,7 @@ io.on('connection', (socket) => {
     if (!interviewRooms[meetingId].find(u => u.id === user.id)) {
       interviewRooms[meetingId].push(userWithSocket);
     }
-    console.log(`User ${user.name} joined room ${meetingId}, participants:`, interviewRooms[meetingId]);
+    console.log(`👤 User ${user.name} joined room ${meetingId}`);
     io.to(meetingId).emit('participantsUpdate', interviewRooms[meetingId]);
   });
 
@@ -58,7 +75,6 @@ io.on('connection', (socket) => {
     socket.leave(meetingId);
     if (interviewRooms[meetingId]) {
       interviewRooms[meetingId] = interviewRooms[meetingId].filter(u => u.id !== userId);
-      console.log(`User left room ${meetingId}, participants:`, interviewRooms[meetingId]);
       io.to(meetingId).emit('participantsUpdate', interviewRooms[meetingId]);
     }
   });
@@ -67,30 +83,34 @@ io.on('connection', (socket) => {
     Object.keys(socket.rooms).forEach(room => {
       if (room !== socket.id && interviewRooms[room]) {
         interviewRooms[room] = interviewRooms[room].filter(u => u.socketId !== socket.id);
-        console.log(`Socket ${socket.id} disconnected, updated room ${room}:`, interviewRooms[room]);
         io.to(room).emit('participantsUpdate', interviewRooms[room]);
       }
     });
   });
 
   socket.on('offer', ({ meetingId, offer, to }) => {
-    console.log(`Sending offer from ${socket.id} to ${to}`);
     io.to(to).emit('offer', { offer, from: socket.id });
   });
 
   socket.on('answer', ({ meetingId, answer, to }) => {
-    console.log(`Sending answer from ${socket.id} to ${to}`);
     io.to(to).emit('answer', { answer, from: socket.id });
   });
 
   socket.on('ice-candidate', ({ meetingId, candidate, to }) => {
-    console.log(`Sending ICE candidate from ${socket.id} to ${to}`);
     io.to(to).emit('ice-candidate', { candidate, from: socket.id });
   });
 });
 
-mongoose.connect(process.env.MONGO_URI || '')
-  .then(() => {
-    httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-  })
-  .catch((err) => console.error('MongoDB connection error:', err));
+const startServer = async () => {
+  try {
+    await connectDB();
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
+
+startServer();

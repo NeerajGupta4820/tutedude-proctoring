@@ -1,145 +1,79 @@
-import Meeting from '../models/Meeting.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { ApiResponse, PaginatedResponse } from '../utils/response.js';
+import meetingService from '../services/meeting.service.js';
 import User from '../models/User.js';
 
-// Admin: Create a meeting
-export const createMeeting = async (req, res) => {
-  try {
-    const { userId, date, time, jobRole, round } = req.body;
+export const createMeeting = asyncHandler(async (req, res) => {
+  const meeting = await meetingService.createMeeting(req.body);
+  res.status(201).json(new ApiResponse(201, meeting, 'Meeting created successfully'));
+});
 
-    // Input validation
-    if (!userId || !date || !time || !jobRole || !round) {
-      return res.status(400).json({ message: 'All fields (userId, date, time, jobRole, round) are required' });
-    }
+export const getAllMeetings = asyncHandler(async (req, res) => {
+  const options = {
+    page: parseInt(req.query.page) || 1,
+    limit: parseInt(req.query.limit) || 100,
+    sort: req.query.sort || '-scheduledDate',
+    status: req.query.status,
+    userId: req.query.userId,
+  };
 
-    // Validate userId
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+  const { meetings, pagination } = await meetingService.getAllMeetings(options);
+  res.json(new PaginatedResponse(200, meetings, pagination, 'Meetings fetched successfully'));
+});
 
-    // Validate date
-    const meetingDate = new Date(date);
-    if (isNaN(meetingDate) || meetingDate < new Date()) {
-      return res.status(400).json({ message: 'Invalid or past date' });
-    }
+export const getMeeting = asyncHandler(async (req, res) => {
+  const meeting = await meetingService.getMeetingById(req.params.id);
+  res.json(new ApiResponse(200, meeting, 'Meeting fetched successfully'));
+});
 
-    // Validate time (assuming time is a string like "14:30")
-    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
-    if (!timeRegex.test(time)) {
-      return res.status(400).json({ message: 'Invalid time format. Use HH:MM (24-hour)' });
-    }
+export const updateMeeting = asyncHandler(async (req, res) => {
+  const meeting = await meetingService.updateMeeting(req.params.id, req.body);
+  res.json(new ApiResponse(200, meeting, 'Meeting updated successfully'));
+});
 
-    const meeting = await Meeting.create({ user: userId, date: meetingDate, time, jobRole, round });
-    res.status(201).json(meeting);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to create meeting', error: error.message });
-  }
-};
+export const getNextMeeting = asyncHandler(async (req, res) => {
+  const meeting = await meetingService.getNextMeeting(req.user.id);
+  res.json(new ApiResponse(200, meeting, 'Next meeting fetched successfully'));
+});
 
-// Admin: Get all meetings
-export const getAllMeetings = async (req, res) => {
-  try {
-    const meetings = await Meeting.find().populate('user', 'name email').sort({ date: 1 });
-    res.json(meetings);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch meetings', error: error.message });
-  }
-};
+export const getAllUsers = asyncHandler(async (req, res) => {
+  const users = await User.find({ role: { $ne: 'admin' } })
+    .select('name email role')
+    .sort({ name: 1 })
+    .lean();
+  res.json(new ApiResponse(200, users, 'Users fetched successfully'));
+});
 
-export const getMeeting = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const meeting = await Meeting.findById(id);
-    res.json(meeting);  
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch meetings', error: error.message });
-  }
-};
+// Editor state management
+const editorStateStore = new Map();
 
-// Admin: Update meeting (rating, review, result, attended)
-export const updateMeeting = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { rating, review, result, attended } = req.body;
-
-    // Validate inputs
-    if (rating !== undefined && (typeof rating !== 'number' || rating < 0 || rating > 10)) {
-      return res.status(400).json({ message: 'Rating must be a number between 0 and 10' });
-    }
-    if (result !== undefined && !['pass', 'fail', 'pending'].includes(result)) {
-      return res.status(400).json({ message: 'Result must be "pass", "fail", or "pending"' });
-    }
-    if (attended !== undefined && typeof attended !== 'boolean') {
-      return res.status(400).json({ message: 'Attended must be a boolean' });
-    }
-
-    const meeting = await Meeting.findByIdAndUpdate(
-      id,
-      { rating, review, result, attended },
-      { new: true, runValidators: true }
-    );
-    if (!meeting) {
-      return res.status(404).json({ message: 'Meeting not found' });
-    }
-    res.json(meeting);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to update meeting', error: error.message });
-  }
-};
-
-// User: Get next meeting (not attended, date >= now)
-export const getNextMeeting = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    const now = new Date();
-    const meeting = await Meeting.findOne({
-      user: userId,
-      attended: false,
-      date: { $gte: now },
-    })
-      .sort({ date: 1 })
-      .populate('user', 'name email');
-    if (!meeting) {
-      return res.status(404).json({ message: 'No upcoming meetings found' });
-    }
-    res.json(meeting);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch next meeting', error: error.message });
-  }
-};
-
-// Admin: Get all users (for dashboard)
-export const getAllUsers = async (req, res) => {
-  try {
-    const users = await User.find({}, 'name email role').sort({ name: 1 });
-    res.json(users);
-  } catch (error) {
-    res.status(500).json({ message: 'Failed to fetch users', error: error.message });
-  }
-};
-
-// In-memory store for code editor visibility per meeting
-const editorOpenStore = {};
-
-// Set code editor open status for a meeting
-export const setEditorOpen = (req, res) => {
+export const getEditorState = asyncHandler(async (req, res) => {
   const meetingId = req.params.id;
-  const { open } = req.body;
-  editorOpenStore[meetingId] = !!open;
-  res.json({ meetingId, open: editorOpenStore[meetingId] });
-};
+  const state = editorStateStore.get(meetingId) || {
+    isOpen: false,
+    language: 'javascript',
+  };
+  res.json(new ApiResponse(200, state));
+});
 
-// Get code editor open status for a meeting
-export const getEditorOpen = (req, res) => {
+export const setEditorState = asyncHandler(async (req, res) => {
   const meetingId = req.params.id;
-  res.json({ meetingId, open: !!editorOpenStore[meetingId] });
-};
+  const { isOpen, language } = req.body;
+  const state = {
+    isOpen: isOpen !== undefined ? isOpen : false,
+    language: language || 'javascript',
+  };
+  editorStateStore.set(meetingId, state);
+  res.json(new ApiResponse(200, state));
+});
+
 export default {
   createMeeting,
   getAllMeetings,
+  getMeeting,
   updateMeeting,
   getNextMeeting,
   getAllUsers,
-  getMeeting,
-  setEditorOpen
+  getEditorState,
+  setEditorState,
 };

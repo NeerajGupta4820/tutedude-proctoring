@@ -4,7 +4,6 @@ import axios from 'axios';
 import Navbar from '../components/Navbar';
 import { AuthContext } from '../components/AuthContext';
 
-
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
@@ -21,7 +20,10 @@ const Home = () => {
         const res = await axios.get('http://localhost:5000/api/meeting/next', {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setMeeting(res.data);
+        
+        // Handle both old and new API response formats
+        const meetingData = res.data.data || res.data;
+        setMeeting(meetingData);
       } catch (err) {
         setMeeting(null);
         if (err.response && err.response.status === 404) {
@@ -61,6 +63,31 @@ const Home = () => {
     }
   };
 
+  // Helper function to get date safely (handles both scheduledDate and date fields)
+  const getMeetingDate = () => {
+    if (!meeting) return '';
+    const dateValue = meeting.scheduledDate || meeting.date;
+    if (!dateValue) return '';
+    return new Date(dateValue).toISOString().slice(0, 10);
+  };
+
+  // Helper function to get time safely (handles both startTime and time fields)
+  const getMeetingTime = () => {
+    if (!meeting) return '';
+    return meeting.startTime || meeting.time || '';
+  };
+
+  // Helper function to get job role (handles both new and old structure)
+  const getJobRole = () => {
+    if (!meeting) return '';
+    return meeting.interviewConfig?.jobRole || meeting.jobRole || '';
+  };
+
+  // Helper function to get round (handles both new and old structure)
+  const getRound = () => {
+    if (!meeting) return '';
+    return meeting.interviewConfig?.round || meeting.round || '';
+  };
 
   return (
     <main className="bg-gray-200 min-h-screen font-sans">
@@ -120,10 +147,18 @@ const Home = () => {
           ) : meeting ? (
             <div className="bg-white rounded-lg shadow p-6 mb-6">
               <h2 className="text-2xl font-bold text-cyan-700 mb-2">Your Upcoming Interview</h2>
-              <div className="mb-2"><span className="font-semibold">Date:</span> {meeting.date?.slice(0,10)}</div>
-              <div className="mb-2"><span className="font-semibold">Time:</span> {meeting.time}</div>
-              <div className="mb-2"><span className="font-semibold">Job Role:</span> {meeting.jobRole}</div>
-              <div className="mb-2"><span className="font-semibold">Round:</span> {meeting.round}</div>
+              <div className="mb-2">
+                <span className="font-semibold">Date:</span> {getMeetingDate()}
+              </div>
+              <div className="mb-2">
+                <span className="font-semibold">Time:</span> {getMeetingTime()}
+              </div>
+              <div className="mb-2">
+                <span className="font-semibold">Job Role:</span> {getJobRole()}
+              </div>
+              <div className="mb-2">
+                <span className="font-semibold">Round:</span> {getRound()}
+              </div>
               <button
                 onClick={handleNext}
                 className="mt-4 bg-cyan-700 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-white hover:text-cyan-700 border-2 border-cyan-700 transition"
@@ -137,14 +172,11 @@ const Home = () => {
         </div>
       </section>
 
-      {/* (Old Next Button removed, now in meeting card) */}
-
       {/* Footer */}
       <footer className="bg-cyan-700 text-white py-4">
         <div className="text-center font-semibold">&copy; The Online interview Proctor System</div>
       </footer>
     </main>
-
   );
 };
 
