@@ -25,14 +25,17 @@ class MeetingService {
 
   async validateQuestions(questionIds) {
     if (!questionIds || questionIds.length === 0) return [];
-    
-    const ids = questionIds.map(q => q.question || q);
-    const questions = await Question.find({ _id: { $in: ids }, isActive: true });
-    
+
+    const ids = questionIds.map((q) => q.question || q);
+    const questions = await Question.find({
+      _id: { $in: ids },
+      isActive: true,
+    });
+
     if (questions.length !== ids.length) {
       throw new ApiError(400, 'One or more questions are invalid or inactive');
     }
-    
+
     return questions;
   }
 
@@ -83,11 +86,12 @@ class MeetingService {
 
   async getMeetingById(meetingId) {
     const meeting = await Meeting.findById(meetingId)
-      .populate('user', 'name email role avatar')
+      .populate('candidate', 'name email phone position')
       .populate('interviewer', 'name email role avatar')
       .populate({
         path: 'assignedQuestions.question',
-        select: 'title description questionType category difficulty format points timeLimit codingDetails',
+        select:
+          'title description questionType category difficulty format points timeLimit codingDetails',
       })
       .lean();
 
@@ -109,12 +113,12 @@ class MeetingService {
 
     const query = {};
     if (status) query.status = status;
-    if (userId) query.user = userId;
+    if (userId) query.candidate = userId;
 
     const skip = (page - 1) * limit;
     const [meetings, total] = await Promise.all([
       Meeting.find(query)
-        .populate('user', 'name email role')
+        .populate('candidate', 'name email position')
         .populate('interviewer', 'name email')
         .populate('assignedQuestions.question', 'title category difficulty')
         .sort(sort)
@@ -136,12 +140,11 @@ class MeetingService {
   }
 
   async updateMeeting(meetingId, updateData) {
-    const meeting = await Meeting.findByIdAndUpdate(
-      meetingId,
-      updateData,
-      { new: true, runValidators: true }
-    )
-      .populate('user', 'name email')
+    const meeting = await Meeting.findByIdAndUpdate(meetingId, updateData, {
+      new: true,
+      runValidators: true,
+    })
+      .populate('candidate', 'name email')
       .populate('assignedQuestions.question');
 
     if (!meeting) {
@@ -151,14 +154,14 @@ class MeetingService {
     return meeting;
   }
 
-  async getNextMeeting(userId) {
+  async getNextMeeting(candidateId) {
     const meeting = await Meeting.findOne({
-      user: userId,
+      candidate: candidateId,
       status: 'scheduled',
       scheduledDate: { $gte: new Date() },
     })
       .sort({ scheduledDate: 1, startTime: 1 })
-      .populate('user', 'name email')
+      .populate('candidate', 'name email')
       .populate('interviewer', 'name email')
       .populate('assignedQuestions.question')
       .lean();

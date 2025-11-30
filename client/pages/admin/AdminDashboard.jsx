@@ -14,6 +14,7 @@ const AdminDashboard = () => {
   const [users, setUsers] = useState([]);
   const [meetings, setMeetings] = useState([]);
   const [questions, setQuestions] = useState([]);
+  const [candidates, setCandidates] = useState([]);
   const [checkingRole, setCheckingRole] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -30,16 +31,19 @@ const AdminDashboard = () => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      
-      const [usersRes, meetingsRes, questionsRes] = await Promise.all([
-        axios.get(`${API_URL}/meeting/users`, { headers }),
-        axios.get(`${API_URL}/meeting`, { headers }),
-        axios.get(`${API_URL}/question`, { headers }),
-      ]);
 
-      setUsers(usersRes.data.data.filter(u => u.role === 'user'));
+      const [usersRes, meetingsRes, questionsRes, candidatesRes] =
+        await Promise.all([
+          axios.get(`${API_URL}/meeting/users`, { headers }),
+          axios.get(`${API_URL}/meeting`, { headers }),
+          axios.get(`${API_URL}/question`, { headers }),
+          axios.get(`${API_URL}/candidate/all`, { headers }),
+        ]);
+
+      setUsers(usersRes.data.data.filter((u) => u.role === 'user'));
       setMeetings(meetingsRes.data.data);
       setQuestions(questionsRes.data.data);
+      setCandidates(candidatesRes.data.data);
     } catch (err) {
       console.error('Failed to fetch data:', err);
     }
@@ -60,11 +64,13 @@ const AdminDashboard = () => {
     );
   }
 
-  const upcomingMeetings = meetings.filter(m => new Date(m.scheduledDate || m.date) >= new Date());
+  const upcomingMeetings = meetings.filter(
+    (m) => new Date(m.scheduledDate || m.date) >= new Date()
+  );
 
   return (
     <div className="flex min-h-screen bg-gray-200">
-      <Sidebar 
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         sidebarOpen={sidebarOpen}
@@ -73,11 +79,13 @@ const AdminDashboard = () => {
         upcomingMeetings={upcomingMeetings}
         questions={questions}
         users={users}
+        candidates={candidates}
       />
-      <MainLayout 
+      <MainLayout
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         users={users}
+        candidates={candidates}
         meetings={meetings}
         upcomingMeetings={upcomingMeetings}
         questions={questions}

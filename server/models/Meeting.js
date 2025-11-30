@@ -2,16 +2,16 @@ import mongoose from 'mongoose';
 
 const meetingSchema = new mongoose.Schema(
   {
-    user: {
+    candidate: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: [true, 'User is required'],
+      ref: 'Candidate',
+      required: [true, 'Candidate is required'],
     },
     interviewer: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
-    
+
     scheduledDate: {
       type: Date,
       required: [true, 'Date is required'],
@@ -19,14 +19,17 @@ const meetingSchema = new mongoose.Schema(
     startTime: {
       type: String,
       required: [true, 'Start time is required'],
-      match: [/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format'],
+      match: [
+        /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/,
+        'Time must be in HH:MM format',
+      ],
     },
     endTime: String,
     duration: {
       type: Number,
       default: 60,
     },
-    
+
     // Interview Configuration
     interviewConfig: {
       type: {
@@ -54,7 +57,7 @@ const meetingSchema = new mongoose.Schema(
         default: 'fresher',
       },
     },
-    
+
     // Tools Configuration
     enabledTools: {
       codeEditor: {
@@ -74,18 +77,20 @@ const meetingSchema = new mongoose.Schema(
         enabled: { type: Boolean, default: true },
       },
     },
-    
+
     // Questions
-    assignedQuestions: [{
-      question: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Question',
+    assignedQuestions: [
+      {
+        question: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'Question',
+        },
+        order: Number,
+        timeAllocated: { type: Number, default: 10 },
+        mandatory: { type: Boolean, default: true },
       },
-      order: Number,
-      timeAllocated: { type: Number, default: 10 },
-      mandatory: { type: Boolean, default: true },
-    }],
-    
+    ],
+
     // Meeting Room
     roomId: {
       type: String,
@@ -93,7 +98,7 @@ const meetingSchema = new mongoose.Schema(
       required: true,
     },
     meetingLink: String,
-    
+
     // Status
     status: {
       type: String,
@@ -106,7 +111,7 @@ const meetingSchema = new mongoose.Schema(
     },
     actualStartTime: Date,
     actualEndTime: Date,
-    
+
     // Evaluation (Old fields for backward compatibility)
     rating: {
       type: Number,
@@ -119,7 +124,7 @@ const meetingSchema = new mongoose.Schema(
       enum: ['pass', 'fail', 'pending'],
       default: 'pending',
     },
-    
+
     // New Evaluation
     evaluation: {
       overallRating: {
@@ -139,20 +144,22 @@ const meetingSchema = new mongoose.Schema(
       strengths: [String],
       improvements: [String],
     },
-    
+
     notes: String,
-    
+
     // Activity Logs
-    activityLogs: [{
-      timestamp: { type: Date, default: Date.now },
-      activity: String,
-      details: mongoose.Schema.Types.Mixed,
-    }],
+    activityLogs: [
+      {
+        timestamp: { type: Date, default: Date.now },
+        activity: String,
+        details: mongoose.Schema.Types.Mixed,
+      },
+    ],
   },
   { timestamps: true }
 );
 
-meetingSchema.index({ user: 1, scheduledDate: 1 });
+meetingSchema.index({ candidate: 1, scheduledDate: 1 });
 meetingSchema.index({ status: 1 });
 meetingSchema.index({ roomId: 1 });
 

@@ -6,16 +6,19 @@ import AllMeetings from './AllMeetings';
 import UpcomingMeetings from './UpcomingMeetings';
 import QuestionManager from './QuestionManager';
 import CreateQuestion from './CreateQuestion';
-import UserManagement from './UserManagement';
+import CandidateManagement from './CandidateManagement';
+import CreateCandidate from './CreateCandidate';
+import InterviewerManagement from './InterviewerManagement';
 
-const ContentBox = ({ 
-  activeTab, 
+const ContentBox = ({
+  activeTab,
   setActiveTab,
-  users, 
-  meetings, 
-  upcomingMeetings, 
-  questions, 
-  onUpdate 
+  users,
+  meetings,
+  upcomingMeetings,
+  questions,
+  candidates,
+  onUpdate,
 }) => {
   const navigate = useNavigate();
   const [editingQuestion, setEditingQuestion] = useState(null);
@@ -28,7 +31,7 @@ const ContentBox = ({
   return (
     <div className="flex-1 overflow-auto p-6">
       {activeTab === 'dashboard' && (
-        <DashboardHome 
+        <DashboardHome
           users={users}
           meetings={meetings}
           upcomingMeetings={upcomingMeetings}
@@ -36,34 +39,28 @@ const ContentBox = ({
           onNavigate={setActiveTab}
         />
       )}
-      
+
       {activeTab === 'create' && (
         <div className="bg-white rounded-lg shadow p-6">
-          <CreateMeeting 
-            users={users} 
-            questions={questions} 
-            onMeetingCreated={onUpdate} 
+          <CreateMeeting
+            users={candidates}
+            questions={questions}
+            onMeetingCreated={onUpdate}
           />
         </div>
       )}
-      
+
       {activeTab === 'upcoming' && (
-        <UpcomingMeetings 
-          meetings={upcomingMeetings} 
-          navigate={navigate} 
-        />
+        <UpcomingMeetings meetings={upcomingMeetings} navigate={navigate} />
       )}
-      
+
       {activeTab === 'all' && (
-        <AllMeetings 
-          meetings={meetings} 
-          navigate={navigate} 
-        />
+        <AllMeetings meetings={meetings} navigate={navigate} />
       )}
-      
+
       {activeTab === 'questions' && (
-        <QuestionManager 
-          questions={questions} 
+        <QuestionManager
+          questions={questions}
           onUpdate={onUpdate}
           onEdit={handleEditQuestion}
         />
@@ -84,11 +81,21 @@ const ContentBox = ({
         />
       )}
 
-      {activeTab === 'users' && (
-        <UserManagement 
-          users={users}
-          meetings={meetings}
+      {activeTab === 'candidates' && (
+        <CandidateManagement candidates={candidates} onUpdate={onUpdate} />
+      )}
+
+      {activeTab === 'create-candidate' && (
+        <CreateCandidate
+          onCandidateCreated={() => {
+            onUpdate();
+            setActiveTab('candidates');
+          }}
         />
+      )}
+
+      {activeTab === 'interviewers' && (
+        <InterviewerManagement onUpdate={onUpdate} />
       )}
     </div>
   );

@@ -1,9 +1,17 @@
 import React, { useState, useContext, useRef, useEffect } from 'react';
-import { FaUser, FaCog, FaChevronDown, FaUserCircle } from 'react-icons/fa';
+import {
+  FaUser,
+  FaCog,
+  FaChevronDown,
+  FaUserCircle,
+  FaSignOutAlt,
+} from 'react-icons/fa';
+import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../../../AuthContext.jsx';
 
 const ProfileDropdown = () => {
-  const { user } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -19,14 +27,27 @@ const ProfileDropdown = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleViewProfile = () => {
+    // Navigate to profile page or show profile modal
+    console.log('View profile for:', user);
+    // You can replace this with actual navigation or modal
+    alert(
+      `Admin Profile:\n\nName: ${user?.name}\nEmail: ${user?.email}\nRole: ${user?.role}`
+    );
+    setIsOpen(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+    setIsOpen(false);
+  };
+
   const menuItems = [
     {
       icon: FaUser,
-      label: 'Profile',
-      onClick: () => {
-        console.log('Profile clicked');
-        setIsOpen(false);
-      }
+      label: 'View Profile',
+      onClick: handleViewProfile,
     },
     {
       icon: FaCog,
@@ -34,8 +55,14 @@ const ProfileDropdown = () => {
       onClick: () => {
         console.log('Settings clicked');
         setIsOpen(false);
-      }
-    }
+      },
+    },
+    {
+      icon: FaSignOutAlt,
+      label: 'Logout',
+      onClick: handleLogout,
+      dividerTop: true,
+    },
   ];
 
   return (
@@ -49,15 +76,21 @@ const ProfileDropdown = () => {
         <div className="w-8 h-8 bg-cyan-700 rounded-full flex items-center justify-center text-white font-medium">
           {user?.name?.charAt(0)?.toUpperCase() || 'A'}
         </div>
-        
+
         {/* Name & Role */}
         <div className="text-left hidden md:block">
-          <div className="text-sm font-medium text-gray-900">{user?.name || 'Admin'}</div>
-          <div className="text-xs text-gray-500 capitalize">{user?.role || 'Administrator'}</div>
+          <div className="text-sm font-medium text-gray-900">
+            {user?.name || 'Admin'}
+          </div>
+          <div className="text-xs text-gray-500 capitalize">
+            {user?.role || 'Administrator'}
+          </div>
         </div>
-        
+
         {/* Dropdown Arrow */}
-        <FaChevronDown className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <FaChevronDown
+          className={`text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {/* Dropdown Menu */}
@@ -68,8 +101,12 @@ const ProfileDropdown = () => {
             <div className="flex items-center gap-3">
               <FaUserCircle className="text-gray-400 text-2xl" />
               <div>
-                <div className="text-sm font-medium text-gray-900">{user?.name || 'Admin User'}</div>
-                <div className="text-xs text-gray-500">{user?.email || 'admin@example.com'}</div>
+                <div className="text-sm font-medium text-gray-900">
+                  {user?.name || 'Admin User'}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {user?.email || 'admin@example.com'}
+                </div>
               </div>
             </div>
           </div>
@@ -79,14 +116,18 @@ const ProfileDropdown = () => {
             {menuItems.map((item, index) => {
               const Icon = item.icon;
               return (
-                <button
-                  key={index}
-                  onClick={item.onClick}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  <Icon className="text-gray-400" />
-                  <span>{item.label}</span>
-                </button>
+                <React.Fragment key={index}>
+                  {item.dividerTop && (
+                    <div className="border-t border-gray-100 my-1" />
+                  )}
+                  <button
+                    onClick={item.onClick}
+                    className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    <Icon className="text-gray-400" />
+                    <span>{item.label}</span>
+                  </button>
+                </React.Fragment>
               );
             })}
           </div>
