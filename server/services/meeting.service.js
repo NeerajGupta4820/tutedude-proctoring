@@ -1,4 +1,5 @@
 import Meeting from '../models/Meeting.js';
+import Candidate from '../models/Candidate.js';
 import User from '../models/User.js';
 import Question from '../models/Question.js';
 import { ApiError } from '../utils/response.js';
@@ -15,10 +16,18 @@ class MeetingService {
     return `${baseUrl}/interview?meetingId=${roomId}`;
   }
 
-  async validateUser(userId) {
+  async validateCandidate(candidateId) {
+    const candidate = await Candidate.findById(candidateId);
+    if (!candidate) {
+      throw new ApiError(404, 'Candidate not found');
+    }
+    return candidate;
+  }
+
+  async validateInterviewer(userId) {
     const user = await User.findById(userId);
     if (!user) {
-      throw new ApiError(404, 'User not found');
+      throw new ApiError(404, 'Interviewer not found');
     }
     return user;
   }
@@ -39,9 +48,9 @@ class MeetingService {
     return questions;
   }
 
-  async createMeeting(meetingData) {
+  async createMeeting(meetingData, currentUserId) {
     const {
-      userId,
+      candidateId,
       interviewerId,
       scheduledDate,
       startTime,
@@ -52,8 +61,8 @@ class MeetingService {
       notes,
     } = meetingData;
 
-    await this.validateUser(userId);
-    if (interviewerId) await this.validateUser(interviewerId);
+    await this.validateCandidate(candidateId);
+    if (interviewerId) await this.validateInterviewer(interviewerId);
     if (assignedQuestions && assignedQuestions.length > 0) {
       await this.validateQuestions(assignedQuestions);
     }
@@ -62,8 +71,8 @@ class MeetingService {
     const meetingLink = this.generateMeetingLink(roomId);
 
     const meeting = await Meeting.create({
-      user: userId,
-      interviewer: interviewerId,
+      candidate: candidateId,
+      interviewer: interviewerId || currentUserId,
       scheduledDate,
       startTime,
       duration,
@@ -108,12 +117,12 @@ class MeetingService {
       limit = 100,
       sort = '-scheduledDate',
       status,
-      userId,
+      candidateId,
     } = options;
 
     const query = {};
     if (status) query.status = status;
-    if (userId) query.candidate = userId;
+    if (candidateId) query.candidate = candidateId;
 
     const skip = (page - 1) * limit;
     const [meetings, total] = await Promise.all([

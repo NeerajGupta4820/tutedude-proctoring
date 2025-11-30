@@ -4,7 +4,7 @@ import meetingService from '../services/meeting.service.js';
 import User from '../models/User.js';
 
 export const createMeeting = asyncHandler(async (req, res) => {
-  const meeting = await meetingService.createMeeting(req.body);
+  const meeting = await meetingService.createMeeting(req.body, req.user.id);
   res.status(201).json(new ApiResponse(201, meeting, 'Meeting created successfully'));
 });
 

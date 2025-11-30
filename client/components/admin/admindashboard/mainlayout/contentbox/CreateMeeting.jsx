@@ -16,7 +16,7 @@ const API_URL = 'http://localhost:5000/api';
 
 const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
   const [form, setForm] = useState({
-    userId: '',
+    candidateId: '',
     scheduledDate: '',
     startTime: '',
     duration: 60,
@@ -115,7 +115,7 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
 
       setSuccess('Meeting scheduled successfully! ✓');
       setForm({
-        userId: '',
+        candidateId: '',
         scheduledDate: '',
         startTime: '',
         duration: 60,
@@ -190,8 +190,8 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                   Select Candidate <span className="text-red-500">*</span>
                 </label>
                 <select
-                  name="userId"
-                  value={form.userId}
+                  name="candidateId"
+                  value={form.candidateId}
                   onChange={handleChange}
                   className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none text-sm bg-white"
                   required
