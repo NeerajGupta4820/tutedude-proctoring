@@ -5,7 +5,9 @@ import User from '../models/User.js';
 
 export const createMeeting = asyncHandler(async (req, res) => {
   const meeting = await meetingService.createMeeting(req.body, req.user.id);
-  res.status(201).json(new ApiResponse(201, meeting, 'Meeting created successfully'));
+  res
+    .status(201)
+    .json(new ApiResponse(201, meeting, 'Meeting created successfully'));
 });
 
 export const getAllMeetings = asyncHandler(async (req, res) => {
@@ -18,7 +20,14 @@ export const getAllMeetings = asyncHandler(async (req, res) => {
   };
 
   const { meetings, pagination } = await meetingService.getAllMeetings(options);
-  res.json(new PaginatedResponse(200, meetings, pagination, 'Meetings fetched successfully'));
+  res.json(
+    new PaginatedResponse(
+      200,
+      meetings,
+      pagination,
+      'Meetings fetched successfully'
+    )
+  );
 });
 
 export const getMeeting = asyncHandler(async (req, res) => {
