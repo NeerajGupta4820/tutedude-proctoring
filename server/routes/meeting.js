@@ -1,4 +1,3 @@
-// routes/meeting.routes.js
 import express from 'express';
 import meetingCtrl from '../controllers/meetingController.js';
 import { requireAdmin, requireAuth } from '../middleware/auth.js';

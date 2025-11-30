@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import {
   FaSearch,
@@ -10,13 +10,23 @@ import {
   FaClock,
   FaUser,
   FaBriefcase,
+  FaEdit,
+  FaArrowLeft,
 } from 'react-icons/fa';
 
 const API_URL = 'http://localhost:5000/api';
 
-const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
+const UpdateMeeting = ({
+  meetingId,
+  users = [],
+  questions = [],
+  onMeetingUpdated,
+  onCancel,
+}) => {
   const [form, setForm] = useState({
-    userId: '',
+    candidateId: '',
+    candidateName: '',
+    candidateEmail: '',
     scheduledDate: '',
     startTime: '',
     duration: 60,
@@ -37,10 +47,78 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
     assignedQuestions: [],
   });
   const [loading, setLoading] = useState(false);
+  const [fetchingData, setFetchingData] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [questionsDropdownOpen, setQuestionsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Fetch existing meeting data on component mount
+  useEffect(() => {
+    if (meetingId) {
+      fetchMeetingData();
+    }
+  }, [meetingId]);
+
+  const fetchMeetingData = async () => {
+    try {
+      setFetchingData(true);
+      setError('');
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${API_URL}/meeting/${meetingId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const meeting = response.data.data || response.data;
+      console.log('meeting', meeting);
+      // Format date for input field
+      const formattedDate = meeting.scheduledDate
+        ? new Date(meeting.scheduledDate).toISOString().split('T')[0]
+        : '';
+
+      // Set form with existing meeting data
+      setForm({
+        candidateId: meeting.user?._id || meeting.userId || '',
+        candidateName: meeting.user?.name || meeting.candidateNameId || '',
+        candidateEmail: meeting.user?.email || meeting.candidateEmail || '',
+        scheduledDate: formattedDate,
+        startTime: meeting.startTime || '',
+        duration: meeting.duration || 60,
+        interviewConfig: {
+          type: meeting.interviewConfig?.type || 'technical',
+          category: meeting.interviewConfig?.category || '',
+          jobRole: meeting.interviewConfig?.jobRole || '',
+          round: meeting.interviewConfig?.round || '',
+          experienceLevel:
+            meeting.interviewConfig?.experienceLevel || 'fresher',
+        },
+        enabledTools: {
+          codeEditor: meeting.enabledTools?.codeEditor || {
+            enabled: false,
+            languages: ['javascript'],
+          },
+          whiteboard: meeting.enabledTools?.whiteboard || { enabled: false },
+          screenShare: meeting.enabledTools?.screenShare || { enabled: false },
+          videoCall: meeting.enabledTools?.videoCall || { enabled: true },
+          chat: meeting.enabledTools?.chat || { enabled: true },
+        },
+        assignedQuestions:
+          meeting.assignedQuestions?.map((q) => ({
+            question:
+              typeof q.question === 'object' ? q.question._id : q.question,
+            timeAllocated: q.timeAllocated || 10,
+          })) || [],
+      });
+    } catch (err) {
+      setError(
+        'Failed to fetch meeting data: ' +
+          (err.response?.data?.message || err.message)
+      );
+      console.error('Error fetching meeting:', err);
+    } finally {
+      setFetchingData(false);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -109,49 +187,45 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
 
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_URL}/meeting`, form, {
+
+      // Prepare update data
+      const updateData = {
+        user: form.userId,
+        scheduledDate: form.scheduledDate,
+        startTime: form.startTime,
+        duration: form.duration,
+        interviewConfig: form.interviewConfig,
+        enabledTools: form.enabledTools,
+        assignedQuestions: form.assignedQuestions,
+      };
+
+      await axios.patch(`${API_URL}/meeting/${meetingId}`, updateData, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setSuccess('Meeting scheduled successfully! ✓');
-      setForm({
-        userId: '',
-        scheduledDate: '',
-        startTime: '',
-        duration: 60,
-        interviewConfig: {
-          type: 'technical',
-          category: '',
-          jobRole: '',
-          round: '',
-          experienceLevel: 'fresher',
-        },
-        enabledTools: {
-          codeEditor: { enabled: false, languages: ['javascript'] },
-          whiteboard: { enabled: false },
-          screenShare: { enabled: false },
-          videoCall: { enabled: true },
-          chat: { enabled: true },
-        },
-        assignedQuestions: [],
-      });
-      setSearchQuery('');
+      setSuccess('Meeting updated successfully! ✓');
 
-      if (onMeetingCreated) onMeetingCreated();
-      setTimeout(() => setSuccess(''), 3000);
+      if (onMeetingUpdated) {
+        setTimeout(() => {
+          onMeetingUpdated();
+        }, 1500);
+      }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to schedule meeting');
+      setError(err.response?.data?.message || 'Failed to update meeting');
+      console.error('Update error:', err);
     }
     setLoading(false);
   };
 
-  // Filter questions based on search
-  const filteredQuestions = questions.filter(
-    (q) =>
-      q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      q.difficulty?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter questions based on search - with safety check
+  const filteredQuestions = Array.isArray(questions)
+    ? questions.filter(
+        (q) =>
+          q.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          q.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          q.difficulty?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
 
   const getDifficultyColor = (difficulty) => {
     switch (difficulty) {
@@ -166,20 +240,67 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
     }
   };
 
+  if (fetchingData) {
+    return (
+      <div className="max-w-5xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-8">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-cyan-100 rounded-full mb-4">
+              <svg
+                className="animate-spin h-6 w-6 text-cyan-600"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+            </div>
+            <p className="text-gray-600">Loading meeting details...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-5xl mx-auto">
       {/* Header Section */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Create New Meeting</h2>
-        <p className="text-gray-600 mt-2">
-          Schedule an interview for a candidate
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <FaEdit className="text-cyan-600" />
+            Update Meeting
+          </h2>
+          <p className="text-gray-600 mt-2">
+            Edit meeting details and configuration
+          </p>
+        </div>
+        {onCancel && (
+          <button
+            onClick={onCancel}
+            className="flex items-center gap-2 px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium"
+          >
+            <FaArrowLeft />
+            Back
+          </button>
+        )}
       </div>
 
-      <div className="bg-white rounded-b-lg shadow-sm">
-        <form onSubmit={handleSubmit} className=" space-y-5">
+      <div className="bg-white rounded-lg shadow-sm">
+        <form onSubmit={handleSubmit} className="space-y-5 p-6">
           {/* Section 1: Basic Information */}
-          <div className="bg-gray-50 r+ounded-lg p-4 border border-gray-200">
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
             <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
               <FaUser className="text-cyan-600" />
               Basic Information
@@ -189,6 +310,9 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                 <label className="block font-medium mb-1.5 text-gray-700 text-xs">
                   Select Candidate <span className="text-red-500">*</span>
                 </label>
+                <span className="text-gray-500 text-xs mb-1 block">
+                  {form.candidateName} ({form.candidateEmail})
+                </span>
                 <select
                   name="userId"
                   value={form.userId}
@@ -197,11 +321,12 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                   required
                 >
                   <option value="">Choose candidate...</option>
-                  {users.map((u) => (
-                    <option key={u._id} value={u._id}>
-                      {u.name} ({u.email})
-                    </option>
-                  ))}
+                  {Array.isArray(users) &&
+                    users.map((u) => (
+                      <option key={u._id} value={u._id}>
+                        {u.name} ({u.email})
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -224,10 +349,10 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                 </select>
               </div>
 
-              {/* Questions Selection - Moved here */}
+              {/* Questions Selection */}
               <div>
                 <label className="block font-medium mb-1.5 text-gray-700 text-xs">
-                  Assign Questions
+                  Assign Questions ({form.assignedQuestions.length} selected)
                 </label>
                 <div className="relative">
                   <button
@@ -259,7 +384,7 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search..."
+                            placeholder="Search questions..."
                             className="w-full pl-8 pr-2 py-1.5 border border-gray-300 rounded text-xs focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none"
                           />
                         </div>
@@ -298,7 +423,7 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                                         <span
                                           className={`px-1.5 py-0.5 text-xs rounded ${getDifficultyColor(q.difficulty)}`}
                                         >
-                                          {q.difficulty}
+                                          {q.difficulty || 'N/A'}
                                         </span>
                                       </div>
                                     </div>
@@ -330,7 +455,7 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
             </div>
 
             {/* Selected Questions Chips */}
-            {form.assignedQuestions.length > 0 && (
+            {form.assignedQuestions.length > 0 && Array.isArray(questions) && (
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {form.assignedQuestions.map((aq) => {
                   const question = questions.find((q) => q._id === aq.question);
@@ -343,7 +468,10 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                       <span className="text-gray-700">{question.title}</span>
                       <button
                         type="button"
-                        onClick={() => handleRemoveQuestion(aq.question)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleRemoveQuestion(aq.question);
+                        }}
                         className="text-red-500 hover:text-red-700"
                       >
                         <FaTimes className="text-xs" />
@@ -371,7 +499,6 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                   name="scheduledDate"
                   value={form.scheduledDate}
                   onChange={handleChange}
-                  min={new Date().toISOString().split('T')[0]}
                   className="border border-gray-300 rounded-lg px-3 py-2 w-full focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 outline-none text-sm"
                   required
                 />
@@ -474,7 +601,7 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                   key={tool.key}
                   onClick={() => handleToolToggle(tool.key)}
                   className={`p-2.5 rounded-lg border cursor-pointer transition-all ${
-                    form.enabledTools[tool.key].enabled
+                    form.enabledTools[tool.key]?.enabled
                       ? 'border-cyan-500 bg-cyan-50 shadow-sm'
                       : 'border-gray-300 bg-white hover:border-gray-400'
                   }`}
@@ -484,7 +611,7 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
                     <div className="text-xs font-medium text-gray-700">
                       {tool.label}
                     </div>
-                    {form.enabledTools[tool.key].enabled && (
+                    {form.enabledTools[tool.key]?.enabled && (
                       <div className="text-xs text-cyan-600 mt-0.5">✓</div>
                     )}
                   </div>
@@ -506,14 +633,23 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
             </div>
           )}
 
-          {/* Submit Button - Right Aligned with Reduced Width */}
-          <div className="flex justify-end pt-2">
+          {/* Submit Buttons */}
+          <div className="flex justify-end gap-3 pt-2">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                className="px-6 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors text-sm border border-gray-300"
+              >
+                Cancel
+              </button>
+            )}
             <button
               type="submit"
               className="px-8 py-2.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 text-sm shadow-sm"
               disabled={loading}
             >
-              {loading ? 'Scheduling...' : 'Schedule Meeting'}
+              {loading ? 'Updating...' : 'Update Meeting'}
             </button>
           </div>
         </form>
@@ -522,4 +658,4 @@ const CreateMeeting = ({ users, questions, onMeetingCreated }) => {
   );
 };
 
-export default CreateMeeting;
+export default UpdateMeeting;

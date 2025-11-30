@@ -2,7 +2,6 @@ import mongoose from 'mongoose';
 
 const questionSchema = new mongoose.Schema(
   {
-    // Basic Info
     title: {
       type: String,
       required: [true, 'Question title is required'],
@@ -18,22 +17,16 @@ const questionSchema = new mongoose.Schema(
       type: Number,
       unique: true,
     },
-    
-    // Question Content
     description: {
       type: String,
       required: [true, 'Question description is required'],
     },
-    
-    // Classification
     difficulty: {
       type: String,
       enum: ['easy', 'medium', 'hard'],
       required: true,
       default: 'medium',
     },
-    
-    // DSA Categories
     category: {
       type: String,
       required: true,
@@ -51,24 +44,17 @@ const questionSchema = new mongoose.Schema(
         'Bitmask', 'Topological Sort', 'Game Theory'
       ],
     },
-    
     tags: [{
       type: String,
     }],
-    
-    // Companies (Optional)
     companies: [{
       name: String,
       frequency: { type: Number, min: 0, max: 10 },
     }],
-    
-    // Problem Statement
     problemStatement: {
       type: String,
       required: true,
     },
-    
-    // Input/Output Format
     inputFormat: {
       type: String,
       required: true,
@@ -77,14 +63,10 @@ const questionSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    
-    // Constraints
     constraints: [{
       type: String,
       required: true,
     }],
-    
-    // Examples
     examples: [{
       input: {
         type: String,
@@ -95,10 +77,8 @@ const questionSchema = new mongoose.Schema(
         required: true,
       },
       explanation: String,
-      image: String, // Optional image URL for visual explanation
+      image: String,
     }],
-    
-    // Test Cases
     testCases: [{
       input: {
         type: String,
@@ -118,15 +98,11 @@ const questionSchema = new mongoose.Schema(
       },
       explanation: String,
     }],
-    
-    // Supported Languages
     supportedLanguages: [{
       type: String,
       enum: ['javascript', 'python', 'java', 'cpp', 'c', 'csharp', 'go', 'rust'],
       default: ['javascript', 'python', 'java', 'cpp'],
     }],
-    
-    // Starter Code for Each Language
     starterCode: {
       javascript: {
         code: String,
@@ -150,8 +126,6 @@ const questionSchema = new mongoose.Schema(
         functionName: String,
       },
     },
-    
-    // Solution (Admin Only)
     solution: {
       approach: String,
       code: {
@@ -170,23 +144,15 @@ const questionSchema = new mongoose.Schema(
       },
       explanation: String,
     },
-    
-    // Hints (Progressive hints)
     hints: [{
-      level: { type: Number, required: true }, // 1, 2, 3
+      level: { type: Number, required: true }, 
       text: { type: String, required: true },
     }],
-    
-    // Follow-up Questions
     followUp: [String],
-    
-    // Similar Questions
     similarQuestions: [{
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Question',
     }],
-    
-    // Metadata
     acceptanceRate: {
       type: Number,
       min: 0,
@@ -201,20 +167,14 @@ const questionSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    
-    // Time Limit (in milliseconds)
     timeLimit: {
       type: Number,
       default: 3000,
     },
-    
-    // Memory Limit (in MB)
     memoryLimit: {
       type: Number,
       default: 256,
     },
-    
-    // Status
     isActive: {
       type: Boolean,
       default: true,
@@ -223,8 +183,6 @@ const questionSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    
-    // Creator
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
