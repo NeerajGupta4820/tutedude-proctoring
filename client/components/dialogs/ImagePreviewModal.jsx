@@ -10,8 +10,6 @@ const ImagePreviewModal = ({ imageUrl, name, onClose }) => {
 
   const handleDownload = (e) => {
     e.stopPropagation();
-
-    // Add Cloudinary download flag
     let downloadUrl = imageUrl;
     if (imageUrl.includes('cloudinary.com')) {
       downloadUrl = imageUrl.replace('/upload/', '/upload/fl_attachment/');

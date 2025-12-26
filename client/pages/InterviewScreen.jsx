@@ -6,28 +6,16 @@ import React, {
   useCallback,
 } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import {
-  FaThLarge,
-  FaUserFriends,
-  FaMicrophone,
-  FaMicrophoneSlash,
-  FaVideo,
-  FaVideoSlash,
-  FaSignOutAlt,
-  FaClock,
-  FaSync,
-  FaWifi,
-} from 'react-icons/fa';
 import { AuthContext } from '../components/AuthContext';
-import CodeEditor from '../components/tools/CodeEditor';
-import ToolsBar from '../components/tools/ToolsBar';
-import QuestionPanel from '../components/tools/QuestionPanel';
-import ChatPanel from '../components/tools/ChatPanel';
-import WhiteboardPanel from '../components/tools/WhiteboardPanel';
-import CandidateProfilePanel from '../components/tools/CandidateProfilePanel';
-import ResumePanel from '../components/tools/ResumePanel';
 import { io } from 'socket.io-client';
 import axios from 'axios';
+
+// ✅ Import Interview Components
+import InterviewHeader from '../components/interview/InterviewHeader';
+import VideoSection from '../components/interview/VideoSection';
+import BottomControls from '../components/interview/BottomControls';
+import RightPanel from '../components/interview/RightPanel';
+import ToolsBar from '../components/tools/ToolsBar';
 
 // ✅ ICE Server Configuration
 const ICE_SERVERS = {
@@ -39,6 +27,9 @@ const ICE_SERVERS = {
   ],
   iceCandidatePoolSize: 10,
 };
+
+// ✅ API Base URL
+const API_BASE_URL = 'http://localhost:5000/api';
 
 const InterviewScreen = () => {
   const { user } = useContext(AuthContext);
@@ -94,7 +85,6 @@ const InterviewScreen = () => {
   const peerConnections = useRef({});
   const pendingCandidates = useRef({});
   const remoteVideoRefs = useRef({});
-  const reconnectTimeoutRef = useRef(null);
 
   // ============================================
   // ✅ TIMER EFFECT
@@ -113,139 +103,144 @@ const InterviewScreen = () => {
   }, []);
 
   // ============================================
-  // ✅ FETCH MEETING DATA
+  // ✅ FETCH MEETING DATA & CANDIDATE DATA
   // ============================================
   useEffect(() => {
-    const fetchMeetingData = async () => {
-      try {
-        console.log('📋 Fetching meeting data for:', meetingId);
-        let meeting = null;
-        let roomIdToUse = meetingId;
-
-        if (meetingId.startsWith('meeting-')) {
-          roomIdToUse = meetingId;
-          try {
-            const response = await axios.get(
-              'http://localhost:5000/api/meeting/',
-              {
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem('token')}`,
-                },
-              }
-            );
-            const meetings =
-              response.data.data?.meetings || response.data.data || [];
-            meeting = meetings.find((m) => m.roomId === roomIdToUse);
-          } catch (err) {
-            console.error('Error fetching meetings:', err);
-          }
-        } else {
-          try {
-            const response = await axios.get(
-              `http://localhost:5000/api/meeting/${meetingId}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem('token')}`,
-                },
-              }
-            );
-            meeting = response.data.data;
-            if (meeting?.roomId) {
-              roomIdToUse = meeting.roomId;
-              // Update URL
-              const newUrl = new URL(window.location);
-              newUrl.searchParams.set('meetingId', roomIdToUse);
-              window.history.replaceState({}, '', newUrl);
-            }
-          } catch (err) {
-            console.error('Error fetching meeting:', err);
-          }
-        }
-
-        if (!meeting) {
-          meeting = {
-            _id: roomIdToUse,
-            roomId: roomIdToUse,
-            interviewConfig: { jobRole: 'Technical Interview' },
-          };
-        }
-
-        setActualRoomId(roomIdToUse);
-        setMeetingData(meeting);
-        console.log('✅ Meeting data set, roomId:', roomIdToUse);
-
-        // Fetch candidate data if admin
-        if (meeting && user?.role === 'admin') {
-          await fetchCandidateData(meeting);
-        }
-
-        // Fetch questions
-        await fetchQuestions(meeting);
-      } catch (error) {
-        console.error('Error in fetchMeetingData:', error);
-        setActualRoomId(meetingId);
-        setMeetingData({ _id: meetingId, roomId: meetingId });
-      }
+    const headers = {
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
     };
 
+    // ✅ FETCH FULL CANDIDATE DATA FROM API
     const fetchCandidateData = async (meeting) => {
       setLoadingCandidate(true);
+      console.log('🔍 Starting candidate data fetch...');
+      console.log('📋 Meeting candidate field:', meeting.candidate);
+
       try {
+        let candidateId = null;
         let candidate = null;
 
+        // Step 1: Extract candidate ID from meeting
         if (meeting.candidate) {
-          if (typeof meeting.candidate === 'object' && meeting.candidate.name) {
-            candidate = meeting.candidate;
-          } else {
-            const res = await axios.get(
-              `http://localhost:5000/api/candidate/${meeting.candidate}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem('token')}`,
-                },
-              }
-            );
-            candidate = res.data.data;
-          }
-        } else if (meeting.user) {
-          if (typeof meeting.user === 'object' && meeting.user.name) {
-            candidate = {
-              _id: meeting.user._id,
-              name: meeting.user.name,
-              email: meeting.user.email,
-              phone: meeting.user.phone || '',
-              position: meeting.interviewConfig?.jobRole || 'Software Engineer',
-            };
+          if (typeof meeting.candidate === 'object' && meeting.candidate._id) {
+            candidateId = meeting.candidate._id;
+            console.log('📋 Got candidate ID from populated object:', candidateId);
+          } else if (typeof meeting.candidate === 'string') {
+            candidateId = meeting.candidate;
+            console.log('📋 Got candidate ID from string:', candidateId);
           }
         }
 
+        // Step 2: ALWAYS fetch full candidate data from /candidate/:id API
+        if (candidateId) {
+          console.log('🌐 Fetching full candidate data from API...');
+          console.log('🌐 API URL:', `${API_BASE_URL}/candidate/${candidateId}`);
+
+          try {
+            const res = await axios.get(
+              `${API_BASE_URL}/candidate/${candidateId}`,
+              { headers }
+            );
+
+            console.log('✅ API Response:', res.data);
+
+            if (res.data.success && res.data.data) {
+              candidate = res.data.data;
+              console.log('✅ Full candidate data received:', {
+                _id: candidate._id,
+                name: candidate.name,
+                email: candidate.email,
+                phone: candidate.phone,
+                position: candidate.position,
+                experience: candidate.experience,
+                photo: candidate.photo ? '✅ Has Photo' : '❌ No Photo',
+                resume: candidate.resume ? '✅ Has Resume' : '❌ No Resume',
+                status: candidate.status,
+                isApproved: candidate.isApproved,
+              });
+            } else {
+              console.log('⚠️ API returned success:false or no data');
+            }
+          } catch (apiError) {
+            console.error('❌ Error fetching candidate from API:', apiError.message);
+
+            // Fallback to populated data if API fails
+            if (meeting.candidate && typeof meeting.candidate === 'object') {
+              candidate = meeting.candidate;
+              console.log('⚠️ Using populated data as fallback');
+            }
+          }
+        } else {
+          console.log('⚠️ No candidate ID found in meeting');
+        }
+
+        // Step 3: If still no candidate, try from meeting.user
+        if (!candidate && meeting.user) {
+          console.log('🔍 Trying to get candidate from meeting.user...');
+          let userId = null;
+
+          if (typeof meeting.user === 'object' && meeting.user._id) {
+            userId = meeting.user._id;
+          } else if (typeof meeting.user === 'string') {
+            userId = meeting.user;
+          }
+
+          if (userId) {
+            try {
+              const res = await axios.get(
+                `${API_BASE_URL}/candidate/${userId}`,
+                { headers }
+              );
+              if (res.data.success && res.data.data) {
+                candidate = res.data.data;
+                console.log('✅ Candidate fetched from user ID:', candidate.name);
+              }
+            } catch (err) {
+              console.error('❌ Error fetching from user ID:', err.message);
+            }
+          }
+        }
+
+        // Step 4: Final fallback
         if (!candidate) {
+          console.log('⚠️ Creating fallback candidate data');
           candidate = {
-            _id: 'unknown',
-            name: 'Candidate',
-            email: 'N/A',
-            position: meeting.interviewConfig?.jobRole || 'Software Engineer',
+            _id: meeting.candidate?._id || 'unknown',
+            name: meeting.candidate?.name || meeting.candidateName || 'Candidate',
+            email: meeting.candidate?.email || meeting.candidateEmail || 'N/A',
+            phone: meeting.candidate?.phone || '',
+            position:
+              meeting.candidate?.position ||
+              meeting.interviewConfig?.jobRole ||
+              'Software Engineer',
+            photo: null,
+            resume: null,
+            experience: 'Not specified',
+            status: 'pending',
+            isApproved: false,
           };
         }
 
+        console.log('✅ Final candidate data set:', candidate);
         setCandidateData(candidate);
       } catch (err) {
-        console.error('Error fetching candidate:', err);
+        console.error('❌ Error in fetchCandidateData:', err);
+        setCandidateData(null);
+      } finally {
+        setLoadingCandidate(false);
       }
-      setLoadingCandidate(false);
     };
 
+    // ✅ FETCH QUESTIONS
     const fetchQuestions = async (meeting) => {
       if (meeting?.assignedQuestions?.length > 0) {
         try {
           const questionIds = meeting.assignedQuestions.map(
             (q) => q.question?._id || q.question || q._id || q
           );
-          const res = await axios.get('http://localhost:5000/api/question/', {
+          const res = await axios.get(`${API_BASE_URL}/question/`, {
             params: { ids: questionIds.join(',') },
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem('token')}`,
-            },
+            headers,
           });
           setQuestions(res.data.data || []);
         } catch (err) {
@@ -257,6 +252,7 @@ const InterviewScreen = () => {
       }
     };
 
+    // ✅ DEFAULT QUESTION
     const loadDefaultQuestion = () => {
       setQuestions([
         {
@@ -283,6 +279,71 @@ const InterviewScreen = () => {
           },
         },
       ]);
+    };
+
+    // ✅ MAIN FETCH MEETING DATA FUNCTION
+    const fetchMeetingData = async () => {
+      try {
+        console.log('📋 Fetching meeting data for:', meetingId);
+        let meeting = null;
+        let roomIdToUse = meetingId;
+
+        if (meetingId.startsWith('meeting-')) {
+          roomIdToUse = meetingId;
+          try {
+            const response = await axios.get(`${API_BASE_URL}/meeting/`, {
+              headers,
+            });
+            const meetings =
+              response.data.data?.meetings || response.data.data || [];
+            meeting = meetings.find((m) => m.roomId === roomIdToUse);
+            console.log('✅ Found meeting by roomId:', meeting?._id);
+          } catch (err) {
+            console.error('Error fetching meetings:', err);
+          }
+        } else {
+          try {
+            const response = await axios.get(
+              `${API_BASE_URL}/meeting/${meetingId}`,
+              { headers }
+            );
+            meeting = response.data.data;
+            if (meeting?.roomId) {
+              roomIdToUse = meeting.roomId;
+              const newUrl = new URL(window.location);
+              newUrl.searchParams.set('meetingId', roomIdToUse);
+              window.history.replaceState({}, '', newUrl);
+            }
+          } catch (err) {
+            console.error('Error fetching meeting:', err);
+          }
+        }
+
+        if (!meeting) {
+          meeting = {
+            _id: roomIdToUse,
+            roomId: roomIdToUse,
+            interviewConfig: { jobRole: 'Technical Interview' },
+          };
+        }
+
+        setActualRoomId(roomIdToUse);
+        setMeetingData(meeting);
+        console.log('✅ Meeting data set:', meeting);
+
+        // ✅ Fetch candidate data if admin
+        if (user?.role === 'admin') {
+          console.log('👤 User is admin, fetching candidate data...');
+          await fetchCandidateData(meeting);
+        }
+
+        // Fetch questions
+        await fetchQuestions(meeting);
+      } catch (error) {
+        console.error('Error in fetchMeetingData:', error);
+        setActualRoomId(meetingId);
+        setMeetingData({ _id: meetingId, roomId: meetingId });
+      }
     };
 
     if (meetingId && user) {
@@ -318,7 +379,6 @@ const InterviewScreen = () => {
           : false,
       });
 
-      // Stop old stream
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -327,7 +387,6 @@ const InterviewScreen = () => {
       setLocalStream(stream);
       setPermissionError('');
 
-      // Update video element
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
@@ -342,7 +401,7 @@ const InterviewScreen = () => {
     }
   }, []);
 
-  // Initialize media on mount based on initial state
+  // Initialize media on mount
   useEffect(() => {
     if (camOn || micOn) {
       getMediaStream(camOn, micOn);
@@ -364,7 +423,6 @@ const InterviewScreen = () => {
         `🔌 Creating peer connection for ${targetSocketId}, initiator: ${isInitiator}`
       );
 
-      // Close existing
       if (peerConnections.current[targetSocketId]) {
         peerConnections.current[targetSocketId].close();
         delete peerConnections.current[targetSocketId];
@@ -374,14 +432,12 @@ const InterviewScreen = () => {
       peerConnections.current[targetSocketId] = pc;
       pendingCandidates.current[targetSocketId] = [];
 
-      // Add local tracks
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => {
           pc.addTrack(track, localStreamRef.current);
         });
       }
 
-      // Handle remote tracks
       pc.ontrack = (event) => {
         console.log(
           `📺 Track received from ${targetSocketId}:`,
@@ -398,7 +454,6 @@ const InterviewScreen = () => {
         }
       };
 
-      // Handle ICE candidates
       pc.onicecandidate = (event) => {
         if (event.candidate && socketRef.current) {
           socketRef.current.emit('ice-candidate', {
@@ -409,7 +464,6 @@ const InterviewScreen = () => {
         }
       };
 
-      // Connection state
       pc.onconnectionstatechange = () => {
         console.log(
           `🔗 Connection state ${targetSocketId}: ${pc.connectionState}`
@@ -420,7 +474,6 @@ const InterviewScreen = () => {
         }));
 
         if (pc.connectionState === 'failed') {
-          console.log('🔄 Connection failed, restarting ICE...');
           pc.restartIce();
         }
 
@@ -436,15 +489,12 @@ const InterviewScreen = () => {
         }
       };
 
-      // ICE connection state
       pc.oniceconnectionstatechange = () => {
-        console.log(`🧊 ICE state ${targetSocketId}: ${pc.iceConnectionState}`);
         if (pc.iceConnectionState === 'failed') {
           pc.restartIce();
         }
       };
 
-      // Create offer if initiator
       if (isInitiator) {
         createAndSendOffer(targetSocketId, pc);
       }
@@ -454,7 +504,6 @@ const InterviewScreen = () => {
     [actualRoomId]
   );
 
-  // Create and send offer
   const createAndSendOffer = useCallback(
     async (targetSocketId, pc) => {
       try {
@@ -476,9 +525,8 @@ const InterviewScreen = () => {
     [actualRoomId]
   );
 
-  // Handle incoming offer
   const handleOffer = useCallback(
-    async ({ offer, from, fromUser }) => {
+    async ({ offer, from }) => {
       console.log(`📥 Offer from ${from}`);
       let pc = peerConnections.current[from];
       if (!pc) {
@@ -488,7 +536,6 @@ const InterviewScreen = () => {
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
-        // Add pending ICE candidates
         if (pendingCandidates.current[from]?.length > 0) {
           for (const candidate of pendingCandidates.current[from]) {
             await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -503,7 +550,6 @@ const InterviewScreen = () => {
           answer: pc.localDescription,
           to: from,
         });
-        console.log(`📤 Answer sent to ${from}`);
       } catch (err) {
         console.error('Error handling offer:', err);
       }
@@ -511,7 +557,6 @@ const InterviewScreen = () => {
     [actualRoomId, createPeerConnection]
   );
 
-  // Handle incoming answer
   const handleAnswer = useCallback(async ({ answer, from }) => {
     console.log(`📥 Answer from ${from}`);
     const pc = peerConnections.current[from];
@@ -519,7 +564,6 @@ const InterviewScreen = () => {
       try {
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
 
-        // Add pending ICE candidates
         if (pendingCandidates.current[from]?.length > 0) {
           for (const candidate of pendingCandidates.current[from]) {
             await pc.addIceCandidate(new RTCIceCandidate(candidate));
@@ -532,7 +576,6 @@ const InterviewScreen = () => {
     }
   }, []);
 
-  // Handle ICE candidate
   const handleIceCandidate = useCallback(async ({ candidate, from }) => {
     const pc = peerConnections.current[from];
     if (pc && pc.remoteDescription?.type) {
@@ -542,7 +585,6 @@ const InterviewScreen = () => {
         console.error('Error adding ICE candidate:', err);
       }
     } else {
-      // Buffer candidate
       if (!pendingCandidates.current[from]) {
         pendingCandidates.current[from] = [];
       }
@@ -550,7 +592,6 @@ const InterviewScreen = () => {
     }
   }, []);
 
-  // Cleanup peer connection
   const cleanupPeerConnection = useCallback((socketId) => {
     console.log(`🗑️ Cleaning up peer connection: ${socketId}`);
     const pc = peerConnections.current[socketId];
@@ -571,14 +612,12 @@ const InterviewScreen = () => {
     });
   }, []);
 
-  // Cleanup all connections
   const cleanupAllConnections = useCallback(() => {
     Object.keys(peerConnections.current).forEach((socketId) => {
       cleanupPeerConnection(socketId);
     });
   }, [cleanupPeerConnection]);
 
-  // Update local stream in all connections
   const updateStreamInConnections = useCallback((newStream) => {
     Object.entries(peerConnections.current).forEach(([socketId, pc]) => {
       const senders = pc.getSenders();
@@ -598,7 +637,6 @@ const InterviewScreen = () => {
   // ============================================
   useEffect(() => {
     if (!actualRoomId || !user?.id) {
-      console.log('⏳ Waiting for roomId and user...');
       return;
     }
 
@@ -616,32 +654,27 @@ const InterviewScreen = () => {
 
     socketRef.current = socket;
 
-    // Socket connected
     socket.on('connect', () => {
       console.log('✅ Socket connected:', socket.id);
       setIsConnected(true);
       setIsReconnecting(false);
 
-      // Join room
       socket.emit('joinInterview', {
         meetingId: actualRoomId,
         user: { id: user.id, name: user.name, role: user.role },
       });
     });
 
-    // Socket disconnected
     socket.on('disconnect', (reason) => {
       console.log('❌ Socket disconnected:', reason);
       setIsConnected(false);
     });
 
-    // Reconnecting
     socket.on('reconnecting', (attemptNumber) => {
       console.log('🔄 Reconnecting... attempt:', attemptNumber);
       setIsReconnecting(true);
     });
 
-    // Participants update
     socket.on('participantsUpdate', (list) => {
       console.log('👥 Participants update:', list.length);
       setParticipants(
@@ -652,7 +685,6 @@ const InterviewScreen = () => {
       );
     });
 
-    // Existing participants (when joining)
     socket.on('existingParticipants', (existingUsers) => {
       console.log('📢 Existing participants:', existingUsers.length);
       existingUsers.forEach((p) => {
@@ -662,31 +694,25 @@ const InterviewScreen = () => {
       });
     });
 
-    // New participant joined
     socket.on('newParticipant', (newUser) => {
       console.log('👤 New participant:', newUser.name);
-      // Will receive offer from them or send offer
     });
 
-    // Request to send offer
     socket.on('sendOfferTo', ({ targetSocketId, targetUser }) => {
       console.log('📤 Sending offer to:', targetUser?.name || targetSocketId);
       createPeerConnection(targetSocketId, true);
     });
 
-    // Participant left
     socket.on('participantLeft', ({ odlid }) => {
       console.log('👋 Participant left:', odlid);
       cleanupPeerConnection(odlid);
       setParticipants((prev) => prev.filter((p) => p.socketId !== odlid));
     });
 
-    // WebRTC signaling
     socket.on('offer', handleOffer);
     socket.on('answer', handleAnswer);
     socket.on('ice-candidate', handleIceCandidate);
 
-    // Chat messages
     socket.on('chatMessage', ({ message, from, timestamp }) => {
       setChatMessages((prev) => [
         ...prev,
@@ -694,7 +720,6 @@ const InterviewScreen = () => {
       ]);
     });
 
-    // Cleanup on unmount
     return () => {
       console.log('🧹 Cleaning up socket...');
       if (socket) {
@@ -797,16 +822,13 @@ const InterviewScreen = () => {
     console.log('🔄 Manual reconnect initiated');
     setIsReconnecting(true);
 
-    // Cleanup existing connections
     cleanupAllConnections();
 
-    // Disconnect and reconnect socket
     if (socketRef.current) {
       socketRef.current.disconnect();
       socketRef.current.connect();
     }
 
-    // Reset state after a delay
     setTimeout(() => {
       setIsReconnecting(false);
     }, 3000);
@@ -818,15 +840,12 @@ const InterviewScreen = () => {
   const handleLeave = useCallback(() => {
     console.log('👋 Leaving meeting...');
 
-    // Stop local stream
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
     }
 
-    // Cleanup connections
     cleanupAllConnections();
 
-    // Disconnect socket
     if (socketRef.current) {
       socketRef.current.emit('leaveInterview', {
         meetingId: actualRoomId,
@@ -835,7 +854,6 @@ const InterviewScreen = () => {
       socketRef.current.disconnect();
     }
 
-    // Navigate
     if (user?.role === 'admin') {
       navigate(`/admin-end-meeting/${meetingId}`, {
         state: { meeting: meetingData },
@@ -877,261 +895,46 @@ const InterviewScreen = () => {
   // ============================================
   // ✅ HELPER FUNCTIONS
   // ============================================
-  const getInitials = (name) => {
-    if (!name) return 'A';
-    const words = name.split(' ');
-    return words.length > 1
-      ? `${words[0][0]}${words[1][0]}`.toUpperCase()
-      : words[0][0].toUpperCase();
-  };
-
   const currentQuestion =
     questions.length > 0 ? questions[currentQuestionIndex] : null;
-  const remoteParticipants = participants.filter((p) => p.id !== user?.id);
 
   // ============================================
-  // ✅ RENDER
+  // ✅ RENDER - USING COMPONENTS
   // ============================================
   return (
     <div className="h-screen bg-gray-200 font-sans flex flex-col overflow-hidden">
-      {/* ✅ HEADER BAR */}
-      <div className="bg-cyan-700 text-white px-6 py-3 shadow-lg flex-shrink-0">
-        <div className="flex justify-between items-center max-w-7xl mx-auto">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold">Interview Room</h1>
-            {meetingData && (
-              <span className="text-sm bg-white/20 px-3 py-1 rounded-lg">
-                {meetingData.interviewConfig?.jobRole || 'Technical Interview'}
-              </span>
-            )}
-            {candidateData && user?.role === 'admin' && (
-              <span className="text-sm bg-white/10 px-3 py-1 rounded-lg">
-                Candidate: {candidateData.name}
-              </span>
-            )}
-            {/* Connection Status */}
-            <div
-              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-                isConnected
-                  ? 'bg-green-500'
-                  : isReconnecting
-                    ? 'bg-yellow-500'
-                    : 'bg-red-500'
-              }`}
-            >
-              <FaWifi size={10} />
-              <span>
-                {isConnected
-                  ? 'Connected'
-                  : isReconnecting
-                    ? 'Reconnecting...'
-                    : 'Disconnected'}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-lg">
-              <FaClock />
-              <span className="font-mono font-semibold">{timer}</span>
-            </div>
-            <div className="text-sm">
-              <span className="font-semibold">{user?.name}</span>
-              {user?.role === 'admin' && (
-                <span className="text-xs ml-2 bg-white/20 px-2 py-0.5 rounded">
-                  Admin
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* ✅ HEADER */}
+      <InterviewHeader
+        meetingData={meetingData}
+        candidateData={candidateData}
+        user={user}
+        timer={timer}
+        isConnected={isConnected}
+        isReconnecting={isReconnecting}
+      />
 
       {/* ✅ MAIN CONTENT */}
       <div className="flex-1 flex overflow-hidden">
         <div className="flex flex-col flex-1">
           <div className="flex-1 flex overflow-hidden">
             {/* ✅ VIDEO SECTION */}
-            <div className="flex-1 p-6 overflow-auto">
-              <div
-                className={`h-full grid ${remoteParticipants.length > 0 ? 'grid-cols-2' : 'grid-cols-1'} gap-6`}
-              >
-                {/* ✅ LOCAL VIDEO */}
-                <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
-                  <div className="relative w-full h-full min-h-[400px] bg-gray-900 flex justify-center items-center">
-                    {camOn && localStream && !permissionError ? (
-                      <>
-                        <video
-                          ref={videoRef}
-                          autoPlay
-                          playsInline
-                          muted
-                          className="absolute inset-0 w-full h-full object-cover"
-                        />
-                        <div className="absolute bottom-3 left-3 bg-cyan-700 text-white px-3 py-1 rounded-lg font-semibold text-sm shadow-lg">
-                          {user?.name || 'You'} (Me)
-                        </div>
-                      </>
-                    ) : (
-                      <div className="flex flex-col items-center text-white">
-                        {permissionError ? (
-                          <div className="text-center p-6 bg-black/30 rounded-lg max-w-md">
-                            <p className="mb-2 font-semibold">
-                              ⚠️ Permission Required
-                            </p>
-                            <p className="text-sm">{permissionError}</p>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="w-24 h-24 bg-cyan-700 rounded-full flex items-center justify-center text-4xl font-bold shadow-xl mb-3">
-                              {getInitials(user?.name)}
-                            </div>
-                            <span className="text-lg font-semibold">
-                              {user?.name || 'User'}
-                            </span>
-                            <span className="text-sm text-gray-400 mt-1">
-                              Camera Off
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    )}
-                    {/* Mic indicator */}
-                    <div className="absolute top-3 right-3 z-30 flex gap-2">
-                      {micOn ? (
-                        <div className="bg-cyan-700 p-2 rounded-full shadow-lg">
-                          <FaMicrophone className="text-white text-lg" />
-                        </div>
-                      ) : (
-                        <div className="bg-red-600 p-2 rounded-full shadow-lg">
-                          <FaMicrophoneSlash className="text-white text-lg" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ✅ REMOTE PARTICIPANTS */}
-                {remoteParticipants.map((p) => {
-                  const remoteStream = remoteStreams[p.socketId];
-                  const connState = connectionStates[p.socketId];
-
-                  return (
-                    <div
-                      key={p.socketId}
-                      className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-                    >
-                      <div className="relative w-full h-full min-h-[400px] bg-gray-900 flex justify-center items-center">
-                        {remoteStream ? (
-                          <>
-                            <video
-                              ref={(el) => {
-                                if (el && el.srcObject !== remoteStream) {
-                                  el.srcObject = remoteStream;
-                                  remoteVideoRefs.current[p.socketId] = el;
-                                }
-                              }}
-                              autoPlay
-                              playsInline
-                              className="absolute inset-0 w-full h-full object-cover"
-                            />
-                            <div className="absolute bottom-3 left-3 bg-cyan-700 text-white px-3 py-1 rounded-lg font-semibold text-sm shadow-lg">
-                              {p.name}
-                            </div>
-                            <div className="absolute top-3 right-3 bg-green-500 px-3 py-1 rounded-full text-white text-xs font-semibold shadow-lg flex items-center gap-1">
-                              <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span>
-                              Live
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex flex-col items-center text-white">
-                            <div className="w-24 h-24 bg-cyan-700 rounded-full flex items-center justify-center text-4xl font-bold shadow-xl mb-3">
-                              {getInitials(p.name)}
-                            </div>
-                            <span className="text-lg font-semibold">
-                              {p.name}
-                            </span>
-                            <span className="text-sm text-gray-400 mt-1">
-                              {connState === 'connecting'
-                                ? 'Connecting...'
-                                : connState === 'connected'
-                                  ? 'Waiting for video...'
-                                  : connState === 'failed'
-                                    ? 'Connection Failed'
-                                    : 'Connecting...'}
-                            </span>
-                            {connState === 'failed' && (
-                              <button
-                                onClick={() =>
-                                  createPeerConnection(p.socketId, true)
-                                }
-                                className="mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                              >
-                                Retry
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* ✅ PARTICIPANTS SIDEBAR */}
-              {showParticipants && (
-                <div className="absolute left-0 top-0 h-full w-80 bg-white shadow-2xl z-20">
-                  <div className="flex justify-between items-center p-4 bg-cyan-700 text-white">
-                    <span className="font-bold text-lg flex items-center gap-2">
-                      <FaUserFriends />
-                      Participants ({participants.length})
-                    </span>
-                    <button
-                      onClick={() => setShowParticipants(false)}
-                      className="text-white hover:bg-white/20 rounded-full p-2"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  <div className="p-4 space-y-3 overflow-y-auto max-h-[calc(100vh-200px)]">
-                    {participants.map((p, idx) => (
-                      <div
-                        key={p.socketId || idx}
-                        className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg"
-                      >
-                        <div className="w-12 h-12 bg-cyan-700 rounded-full flex items-center justify-center text-white font-bold text-lg shadow">
-                          {getInitials(p.name)}
-                        </div>
-                        <div className="flex-1">
-                          <div className="font-semibold text-gray-800">
-                            {p.name} {p.id === user?.id && '(You)'}
-                          </div>
-                          <div
-                            className={`text-xs flex items-center gap-1 ${
-                              remoteStreams[p.socketId] || p.id === user?.id
-                                ? 'text-green-600'
-                                : 'text-gray-500'
-                            }`}
-                          >
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                remoteStreams[p.socketId] || p.id === user?.id
-                                  ? 'bg-green-500'
-                                  : 'bg-gray-400'
-                              }`}
-                            ></span>
-                            {p.id === user?.id
-                              ? 'You'
-                              : remoteStreams[p.socketId]
-                                ? 'Connected'
-                                : 'Connecting...'}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <VideoSection
+              videoRef={videoRef}
+              user={user}
+              camOn={camOn}
+              micOn={micOn}
+              localStream={localStream}
+              permissionError={permissionError}
+              participants={participants}
+              remoteStreams={remoteStreams}
+              connectionStates={connectionStates}
+              remoteVideoRefs={remoteVideoRefs}
+              showParticipants={showParticipants}
+              onCloseParticipants={() => setShowParticipants(false)}
+              onRetryConnection={(socketId) =>
+                createPeerConnection(socketId, true)
+              }
+            />
 
             {/* ✅ TOOLS BAR */}
             <ToolsBar
@@ -1144,152 +947,43 @@ const InterviewScreen = () => {
           </div>
 
           {/* ✅ BOTTOM CONTROLS */}
-          <div className="bg-white border-t border-gray-300 shadow-lg flex-shrink-0">
-            <div className="flex items-center justify-center gap-3 px-6 py-4">
-              {/* Mic Toggle */}
-              <button
-                onClick={toggleMic}
-                className={`p-4 rounded-lg font-semibold transition-all shadow-md hover:scale-105 ${
-                  micOn
-                    ? 'bg-cyan-700 text-white hover:bg-cyan-800'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-                title={micOn ? 'Mute Mic' : 'Unmute Mic'}
-              >
-                {micOn ? (
-                  <FaMicrophone size={20} />
-                ) : (
-                  <FaMicrophoneSlash size={20} />
-                )}
-              </button>
-
-              {/* Camera Toggle */}
-              <button
-                onClick={toggleCamera}
-                className={`p-4 rounded-lg font-semibold transition-all shadow-md hover:scale-105 ${
-                  camOn
-                    ? 'bg-cyan-700 text-white hover:bg-cyan-800'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
-                title={camOn ? 'Turn Off Camera' : 'Turn On Camera'}
-              >
-                {camOn ? <FaVideo size={20} /> : <FaVideoSlash size={20} />}
-              </button>
-
-              {/* Layout Toggle */}
-              <button
-                onClick={() =>
-                  setLayout(layout === 'grid' ? 'speaker' : 'grid')
-                }
-                className="p-4 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all shadow-md hover:scale-105"
-                title="Switch Layout"
-              >
-                <FaThLarge size={20} />
-              </button>
-
-              {/* Participants Toggle */}
-              <button
-                onClick={() => setShowParticipants((v) => !v)}
-                className="p-4 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all shadow-md hover:scale-105 relative"
-                title="Show Participants"
-              >
-                <FaUserFriends size={20} />
-                {participants.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-cyan-700 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-                    {participants.length}
-                  </span>
-                )}
-              </button>
-
-              {/* Reconnect Button */}
-              <button
-                onClick={handleReconnect}
-                disabled={isReconnecting}
-                className={`p-4 rounded-lg transition-all shadow-md hover:scale-105 ${
-                  isReconnecting
-                    ? 'bg-yellow-500 text-white cursor-not-allowed'
-                    : 'bg-blue-500 text-white hover:bg-blue-600'
-                }`}
-                title="Reconnect"
-              >
-                <FaSync
-                  size={20}
-                  className={isReconnecting ? 'animate-spin' : ''}
-                />
-              </button>
-
-              <div className="h-8 w-px bg-gray-300 mx-2"></div>
-
-              {/* Leave Button */}
-              <button
-                onClick={handleLeave}
-                className="px-6 py-4 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all shadow-md hover:scale-105 flex items-center gap-2"
-                title="Leave Interview"
-              >
-                <FaSignOutAlt size={20} />
-                <span>Leave</span>
-              </button>
-            </div>
-          </div>
+          <BottomControls
+            micOn={micOn}
+            camOn={camOn}
+            layout={layout}
+            isReconnecting={isReconnecting}
+            participantsCount={participants.length}
+            onToggleMic={toggleMic}
+            onToggleCamera={toggleCamera}
+            onToggleLayout={() =>
+              setLayout(layout === 'grid' ? 'speaker' : 'grid')
+            }
+            onToggleParticipants={() => setShowParticipants((v) => !v)}
+            onReconnect={handleReconnect}
+            onLeave={handleLeave}
+          />
         </div>
 
         {/* ✅ RIGHT PANEL */}
-        {activePanel && (
-          <div className="w-[480px] h-full border-l border-gray-300 bg-white flex-shrink-0">
-            {activePanel === 'code' && (
-              <CodeEditor
-                question={currentQuestion}
-                code={code}
-                setCode={setCode}
-                language={language}
-                setLanguage={setLanguage}
-                visible={true}
-                onClose={() => setActivePanel(null)}
-              />
-            )}
-
-            {activePanel === 'question' && (
-              <QuestionPanel
-                questions={questions}
-                currentQuestionIndex={currentQuestionIndex}
-                setCurrentQuestionIndex={setCurrentQuestionIndex}
-                onClose={() => setActivePanel(null)}
-              />
-            )}
-
-            {activePanel === 'chat' && (
-              <ChatPanel
-                messages={chatMessages}
-                onSendMessage={handleSendMessage}
-                currentUser={user}
-                onClose={() => setActivePanel(null)}
-              />
-            )}
-
-            {activePanel === 'whiteboard' && (
-              <WhiteboardPanel
-                onClose={() => setActivePanel(null)}
-                meetingId={actualRoomId}
-                socket={socketRef.current}
-              />
-            )}
-
-            {activePanel === 'profile' && user?.role === 'admin' && (
-              <CandidateProfilePanel
-                candidate={candidateData}
-                onClose={() => setActivePanel(null)}
-                loading={loadingCandidate}
-              />
-            )}
-
-            {activePanel === 'resume' && (
-              <ResumePanel
-                candidate={candidateData}
-                onClose={() => setActivePanel(null)}
-              />
-            )}
-          </div>
-        )}
+        <RightPanel
+          activePanel={activePanel}
+          setActivePanel={setActivePanel}
+          currentQuestion={currentQuestion}
+          code={code}
+          setCode={setCode}
+          language={language}
+          setLanguage={setLanguage}
+          questions={questions}
+          currentQuestionIndex={currentQuestionIndex}
+          setCurrentQuestionIndex={setCurrentQuestionIndex}
+          chatMessages={chatMessages}
+          handleSendMessage={handleSendMessage}
+          user={user}
+          actualRoomId={actualRoomId}
+          socket={socketRef.current}
+          candidateData={candidateData}
+          loadingCandidate={loadingCandidate}
+        />
       </div>
     </div>
   );

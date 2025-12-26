@@ -44,7 +44,7 @@ const ToolsBar = ({ activePanel, setActivePanel, meetingData, user }) => {
       enabled: meetingData?.enabledTools?.whiteboard?.enabled ?? true,
       color: 'from-orange-500 to-orange-600',
       hoverColor: 'hover:from-orange-600 hover:to-orange-700',
-      adminOnly: true,
+      adminOnly: false,
     },
     {
       id: 'profile',

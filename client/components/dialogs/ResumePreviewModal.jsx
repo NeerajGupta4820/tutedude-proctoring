@@ -18,7 +18,6 @@ const ResumePreviewModal = ({ resumeUrl, name, onClose }) => {
     }
   };
 
-  // Get file extension
   const getFileExtension = () => {
     if (!resumeUrl) return '';
     const url = resumeUrl.toLowerCase();
@@ -30,7 +29,6 @@ const ResumePreviewModal = ({ resumeUrl, name, onClose }) => {
 
   const fileType = getFileExtension();
 
-  // Get file icon based on type
   const getFileIcon = () => {
     switch (fileType) {
       case 'pdf':
@@ -43,7 +41,6 @@ const ResumePreviewModal = ({ resumeUrl, name, onClose }) => {
     }
   };
 
-  // Download with candidate name
   const handleDownload = () => {
     let downloadUrl = resumeUrl;
     if (resumeUrl.includes('cloudinary.com')) {
@@ -51,7 +48,6 @@ const ResumePreviewModal = ({ resumeUrl, name, onClose }) => {
     }
 
     const fileName = `${name?.replace(/\s+/g, '_') || 'candidate'}_resume`;
-
     const link = document.createElement('a');
     link.href = downloadUrl;
     link.download = fileName;
@@ -61,33 +57,35 @@ const ResumePreviewModal = ({ resumeUrl, name, onClose }) => {
     document.body.removeChild(link);
   };
 
-  // Open in new tab
   const openInNewTab = () => {
     window.open(resumeUrl, '_blank');
   };
 
-  // Get preview URL
   const getPreviewUrl = () => {
     if (!resumeUrl) return '';
 
-    // For Cloudinary URLs
     if (resumeUrl.includes('cloudinary.com')) {
-      // PDF can be previewed directly
       if (fileType === 'pdf') {
         return resumeUrl;
       }
-      // For DOC/DOCX - use Google Docs Viewer
       return `https://docs.google.com/viewer?url=${encodeURIComponent(resumeUrl)}&embedded=true`;
     }
 
-    // For other URLs
     if (fileType === 'pdf') {
       return resumeUrl;
     }
 
-    // Use Google Docs Viewer for Word documents
     return `https://docs.google.com/viewer?url=${encodeURIComponent(resumeUrl)}&embedded=true`;
   };
+
+  // Handle ESC key
+  React.useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
 
   return (
     <div
@@ -145,7 +143,6 @@ const ResumePreviewModal = ({ resumeUrl, name, onClose }) => {
 
         {/* Preview Content */}
         <div className="flex-1 bg-gray-100 relative overflow-hidden">
-          {/* Loading State */}
           {loading && !error && (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
               <div className="text-center">
@@ -158,7 +155,6 @@ const ResumePreviewModal = ({ resumeUrl, name, onClose }) => {
             </div>
           )}
 
-          {/* Error State */}
           {error ? (
             <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
               <div className="text-center p-8 max-w-md">
@@ -169,8 +165,8 @@ const ResumePreviewModal = ({ resumeUrl, name, onClose }) => {
                   Preview not available
                 </h3>
                 <p className="text-gray-500 text-sm mb-6">
-                  This document cannot be previewed directly in the browser. You
-                  can open it in a new tab or download it to view.
+                  This document cannot be previewed directly. You can open it in
+                  a new tab or download it.
                 </p>
                 <div className="flex gap-3 justify-center">
                   <button
@@ -204,7 +200,7 @@ const ResumePreviewModal = ({ resumeUrl, name, onClose }) => {
           )}
         </div>
 
-        {/* Footer Info */}
+        {/* Footer */}
         <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-500 flex-shrink-0">
           <span>
             {fileType === 'pdf'
