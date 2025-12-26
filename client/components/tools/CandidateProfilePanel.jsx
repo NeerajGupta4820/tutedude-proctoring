@@ -7,13 +7,12 @@ import {
   FaBriefcase,
   FaGraduationCap,
   FaCalendarAlt,
-  FaCheck,
   FaStickyNote,
   FaEye,
   FaDownload,
   FaFilePdf,
 } from 'react-icons/fa';
-import ImagePreviewModal from '../../components/admin/admindashboard/mainlayout/contentbox/CandidateManager/CandidateProfile';
+import ImagePreviewModal from '../dialogs/ImagePreviewModal';
 import ResumePreviewModal from '../dialogs/ResumePreviewModal';
 
 const CandidateProfilePanel = ({ candidate, onClose }) => {
@@ -22,10 +21,39 @@ const CandidateProfilePanel = ({ candidate, onClose }) => {
 
   if (!candidate) {
     return (
-      <div className="w-96 h-full bg-gray-900 border-l border-gray-700 flex items-center justify-center">
-        <div className="text-center text-gray-400">
-          <FaUser size={48} className="mx-auto mb-4 opacity-50" />
-          <p>No candidate data available</p>
+      <div className="w-full h-full bg-gray-900 border-l border-gray-700 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-pink-600 flex items-center justify-center">
+              <FaUser className="text-white" size={16} />
+            </div>
+            <div>
+              <h2 className="text-white font-bold">Candidate Profile</h2>
+              <p className="text-xs text-gray-400">View candidate details</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            <FaTimes size={18} />
+          </button>
+        </div>
+
+        {/* Empty State */}
+        <div className="flex-1 flex items-center justify-center bg-gray-800">
+          <div className="text-center p-8">
+            <div className="w-20 h-20 bg-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-gray-600">
+              <FaUser size={40} className="text-gray-500" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-100 mb-2">
+              No Candidate Data
+            </h3>
+            <p className="text-gray-400 text-sm">
+              Candidate information not available at the moment.
+            </p>
+          </div>
         </div>
       </div>
     );
@@ -80,7 +108,7 @@ const CandidateProfilePanel = ({ candidate, onClose }) => {
   };
 
   return (
-    <div className="w-96 h-full bg-gray-900 border-l border-gray-700 flex flex-col">
+    <div className="w-full h-full bg-gray-900 border-l border-gray-700 flex flex-col">
       {/* Image Preview Modal */}
       {showImagePreview && candidate.photo && (
         <ImagePreviewModal
@@ -100,19 +128,19 @@ const CandidateProfilePanel = ({ candidate, onClose }) => {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+      <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-800 flex-shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
             <FaUser className="text-white" size={16} />
           </div>
-          <div>
-            <h2 className="text-white font-bold">Candidate Profile</h2>
+          <div className="min-w-0">
+            <h2 className="text-white font-bold truncate">Candidate Profile</h2>
             <p className="text-xs text-gray-400">View candidate details</p>
           </div>
         </div>
         <button
           onClick={onClose}
-          className="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg transition-colors"
+          className="text-gray-400 hover:text-white p-2 hover:bg-gray-700 rounded-lg transition-colors flex-shrink-0"
         >
           <FaTimes size={18} />
         </button>
@@ -152,8 +180,10 @@ const CandidateProfilePanel = ({ candidate, onClose }) => {
           </div>
 
           {/* Name & Email */}
-          <h3 className="text-white font-bold text-lg">{candidate.name}</h3>
-          <p className="text-gray-400 text-sm">{candidate.email}</p>
+          <h3 className="text-white font-bold text-lg break-words">
+            {candidate.name}
+          </h3>
+          <p className="text-gray-400 text-sm break-all">{candidate.email}</p>
 
           {/* Status Badges */}
           <div className="flex flex-wrap justify-center gap-2 mt-3">
@@ -178,19 +208,21 @@ const CandidateProfilePanel = ({ candidate, onClose }) => {
           </h4>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FaEnvelope className="text-gray-400" size={12} />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-500">Email</p>
-                <p className="text-white text-sm">{candidate.email}</p>
+                <p className="text-white text-sm break-all">
+                  {candidate.email}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FaPhone className="text-gray-400" size={12} />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-500">Phone</p>
                 <p className="text-white text-sm">
                   {candidate.phone || 'Not provided'}
@@ -208,24 +240,24 @@ const CandidateProfilePanel = ({ candidate, onClose }) => {
           </h4>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FaBriefcase className="text-gray-400" size={12} />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-500">Position</p>
-                <p className="text-white text-sm">
+                <p className="text-white text-sm break-words">
                   {candidate.position || 'Not specified'}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
+              <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
                 <FaGraduationCap className="text-gray-400" size={12} />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs text-gray-500">Experience</p>
                 <span
-                  className={`px-2 py-0.5 rounded text-xs font-medium border capitalize ${getExperienceColor(candidate.experience)}`}
+                  className={`inline-block px-2 py-0.5 rounded text-xs font-medium border capitalize ${getExperienceColor(candidate.experience)}`}
                 >
                   {candidate.experience || 'Not specified'}
                 </span>
@@ -233,10 +265,10 @@ const CandidateProfilePanel = ({ candidate, onClose }) => {
             </div>
             {candidate.interviewDate && (
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center">
+                <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
                   <FaCalendarAlt className="text-gray-400" size={12} />
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-gray-500">Interview Date</p>
                   <p className="text-white text-sm">
                     {new Date(candidate.interviewDate).toLocaleDateString(
@@ -265,7 +297,7 @@ const CandidateProfilePanel = ({ candidate, onClose }) => {
               {candidate.description && (
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Description</p>
-                  <p className="text-gray-300 text-sm bg-gray-700/50 rounded-lg p-2">
+                  <p className="text-gray-300 text-sm bg-gray-700/50 rounded-lg p-2 break-words">
                     {candidate.description}
                   </p>
                 </div>
@@ -273,7 +305,7 @@ const CandidateProfilePanel = ({ candidate, onClose }) => {
               {candidate.notes && (
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Notes</p>
-                  <p className="text-gray-300 text-sm bg-gray-700/50 rounded-lg p-2">
+                  <p className="text-gray-300 text-sm bg-gray-700/50 rounded-lg p-2 break-words">
                     {candidate.notes}
                   </p>
                 </div>

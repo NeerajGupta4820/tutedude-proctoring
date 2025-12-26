@@ -12,7 +12,7 @@ router.get('/', requireAdmin, meetingCtrl.getAllMeetings);
 
 router.get('/:id/editor-state', requireAuth, meetingCtrl.getEditorState);
 router.post('/:id/editor-state', requireAuth, meetingCtrl.setEditorState);
-router.get('/:id', requireAdmin, meetingCtrl.getMeeting);
+router.get('/:id', requireAuth, meetingCtrl.getMeeting);
 router.patch('/:id', requireAdmin, meetingCtrl.updateMeeting);
 
 export default router;

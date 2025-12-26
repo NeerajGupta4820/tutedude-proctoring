@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import http from 'http';
 import { Server as SocketIO } from 'socket.io';
+import setupSocketHandlers from './config/socketHandler.js';
 import authRoutes from './routes/auth.js';
 import candidateRoutes from './routes/candidate.js';
 import interviewerRoutes from './routes/interviewer.js';
@@ -32,9 +33,6 @@ app.use(
 );
 
 app.use(express.json());
-
-// No need for static files now - Cloudinary serves them!
-// app.use(express.static('uploads')); // REMOVED
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -65,61 +63,14 @@ const io = new SocketIO(httpServer, {
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  // ✅ Faster reconnection settings
+  pingTimeout: 30000,
+  pingInterval: 10000,
+  transports: ['websocket', 'polling'],
 });
 
-const interviewRooms = {};
-
-io.on('connection', (socket) => {
-  console.log(`✅ Socket connected: ${socket.id}`);
-
-  socket.on('joinInterview', ({ meetingId, user }) => {
-    if (!user.id) {
-      console.error('❌ Invalid user, missing id:', user);
-      return;
-    }
-    socket.join(meetingId);
-    if (!interviewRooms[meetingId]) interviewRooms[meetingId] = [];
-    const userWithSocket = { ...user, socketId: socket.id };
-    if (!interviewRooms[meetingId].find((u) => u.id === user.id)) {
-      interviewRooms[meetingId].push(userWithSocket);
-    }
-    console.log(`👤 User ${user.name} joined room ${meetingId}`);
-    io.to(meetingId).emit('participantsUpdate', interviewRooms[meetingId]);
-  });
-
-  socket.on('leaveInterview', ({ meetingId, userId }) => {
-    socket.leave(meetingId);
-    if (interviewRooms[meetingId]) {
-      interviewRooms[meetingId] = interviewRooms[meetingId].filter(
-        (u) => u.id !== userId
-      );
-      io.to(meetingId).emit('participantsUpdate', interviewRooms[meetingId]);
-    }
-  });
-
-  socket.on('disconnecting', () => {
-    Object.keys(socket.rooms).forEach((room) => {
-      if (room !== socket.id && interviewRooms[room]) {
-        interviewRooms[room] = interviewRooms[room].filter(
-          (u) => u.socketId !== socket.id
-        );
-        io.to(room).emit('participantsUpdate', interviewRooms[room]);
-      }
-    });
-  });
-
-  socket.on('offer', ({ meetingId, offer, to }) => {
-    io.to(to).emit('offer', { offer, from: socket.id });
-  });
-
-  socket.on('answer', ({ meetingId, answer, to }) => {
-    io.to(to).emit('answer', { answer, from: socket.id });
-  });
-
-  socket.on('ice-candidate', ({ meetingId, candidate, to }) => {
-    io.to(to).emit('ice-candidate', { candidate, from: socket.id });
-  });
-});
+// ✅ Setup socket handlers from separate file
+setupSocketHandlers(io);
 
 const startServer = async () => {
   try {

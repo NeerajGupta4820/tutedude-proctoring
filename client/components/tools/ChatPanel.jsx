@@ -22,9 +22,9 @@ const ChatPanel = ({ messages, onSendMessage, currentUser, onClose }) => {
   };
 
   return (
-    <div className="w-2/5 bg-white shadow-lg flex flex-col">
+    <div className="w-full h-full bg-white shadow-lg flex flex-col">
       {/* Header */}
-      <div className="flex justify-between items-center p-4 border-b bg-cyan-700 text-white">
+      <div className="flex justify-between items-center p-4 border-b bg-cyan-700 text-white flex-shrink-0">
         <h2 className="text-xl font-bold">Chat</h2>
         <button onClick={onClose} className="text-white hover:text-gray-200">
           <FaTimes size={20} />
@@ -44,7 +44,7 @@ const ChatPanel = ({ messages, onSendMessage, currentUser, onClose }) => {
               className={`flex ${msg.isMe ? 'justify-end' : 'justify-start'}`}
             >
               <div
-                className={`max-w-xs px-4 py-2 rounded-lg ${
+                className={`max-w-[80%] px-4 py-2 rounded-lg ${
                   msg.isMe
                     ? 'bg-cyan-600 text-white rounded-br-none'
                     : 'bg-gray-300 text-gray-800 rounded-bl-none'
@@ -53,7 +53,7 @@ const ChatPanel = ({ messages, onSendMessage, currentUser, onClose }) => {
                 <p className="text-xs font-semibold mb-1">
                   {msg.isMe ? 'You' : msg.from}
                 </p>
-                <p className="text-sm">{msg.message}</p>
+                <p className="text-sm break-words">{msg.message}</p>
                 <p className="text-xs opacity-75 mt-1">
                   {new Date(msg.timestamp).toLocaleTimeString()}
                 </p>
@@ -65,18 +65,21 @@ const ChatPanel = ({ messages, onSendMessage, currentUser, onClose }) => {
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSend} className="p-4 border-t bg-white">
+      <form
+        onSubmit={handleSend}
+        className="p-4 border-t bg-white flex-shrink-0"
+      >
         <div className="flex gap-2">
           <input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 min-w-0"
           />
           <button
             type="submit"
-            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition"
+            className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition flex-shrink-0"
           >
             <FaPaperPlane />
           </button>

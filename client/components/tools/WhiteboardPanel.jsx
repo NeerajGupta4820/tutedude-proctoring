@@ -3,20 +3,26 @@ import { FaTimes, FaEraser, FaPen, FaUndo, FaTrash } from 'react-icons/fa';
 
 const WhiteboardPanel = ({ onClose, meetingId, socket }) => {
   const canvasRef = useRef(null);
+  const containerRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#000000');
   const [lineWidth, setLineWidth] = useState(2);
-  const [tool, setTool] = useState('pen'); // 'pen' or 'eraser'
+  const [tool, setTool] = useState('pen');
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (canvas) {
+    const container = containerRef.current;
+
+    if (canvas && container) {
+      // Set canvas size to match container
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+
       const ctx = canvas.getContext('2d');
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
     }
 
-    // Listen for drawing from other participants
     if (socket) {
       socket.on('whiteboard-draw', ({ from, to, color, lineWidth, tool }) => {
         drawLine(from, to, color, lineWidth, tool);
@@ -61,7 +67,6 @@ const WhiteboardPanel = ({ onClose, meetingId, socket }) => {
     ctx.lineTo(x, y);
     ctx.stroke();
 
-    // Emit drawing to other participants
     if (socket) {
       socket.emit('whiteboard-draw', {
         meetingId,
@@ -103,9 +108,9 @@ const WhiteboardPanel = ({ onClose, meetingId, socket }) => {
   };
 
   return (
-    <div className="w-2/5 bg-white shadow-lg flex flex-col">
+    <div className="w-full h-full bg-white shadow-lg flex flex-col">
       {/* Header */}
-      <div className="flex justify-between items-center p-4 border-b bg-orange-500 text-white">
+      <div className="flex justify-between items-center p-4 border-b bg-orange-500 text-white flex-shrink-0">
         <h2 className="text-xl font-bold">Whiteboard</h2>
         <button onClick={onClose} className="text-white hover:text-gray-200">
           <FaTimes size={20} />
@@ -113,7 +118,7 @@ const WhiteboardPanel = ({ onClose, meetingId, socket }) => {
       </div>
 
       {/* Toolbar */}
-      <div className="p-3 border-b bg-gray-100 flex items-center gap-3 flex-wrap">
+      <div className="p-3 border-b bg-gray-100 flex items-center gap-3 flex-wrap flex-shrink-0">
         <button
           onClick={() => setTool('pen')}
           className={`p-2 rounded ${tool === 'pen' ? 'bg-orange-500 text-white' : 'bg-gray-200'}`}
@@ -128,7 +133,7 @@ const WhiteboardPanel = ({ onClose, meetingId, socket }) => {
         >
           <FaEraser />
         </button>
-        
+
         <input
           type="color"
           value={color}
@@ -136,7 +141,7 @@ const WhiteboardPanel = ({ onClose, meetingId, socket }) => {
           className="w-10 h-10 rounded cursor-pointer"
           title="Color"
         />
-        
+
         <input
           type="range"
           min="1"
@@ -146,7 +151,7 @@ const WhiteboardPanel = ({ onClose, meetingId, socket }) => {
           className="w-24"
           title="Line Width"
         />
-        
+
         <button
           onClick={handleClear}
           className="p-2 rounded bg-red-500 text-white hover:bg-red-600"
@@ -157,11 +162,9 @@ const WhiteboardPanel = ({ onClose, meetingId, socket }) => {
       </div>
 
       {/* Canvas */}
-      <div className="flex-1 p-4 bg-gray-50 overflow-hidden">
+      <div ref={containerRef} className="flex-1 bg-gray-50 overflow-hidden">
         <canvas
           ref={canvasRef}
-          width={800}
-          height={600}
           onMouseDown={startDrawing}
           onMouseMove={draw}
           onMouseUp={stopDrawing}
