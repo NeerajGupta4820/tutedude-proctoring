@@ -9,10 +9,9 @@ import {
   FaSignOutAlt,
   FaBars,
   FaTimes,
-  FaChevronDown,
-  FaChevronRight,
   FaPlus,
   FaList,
+  FaUserPlus,
 } from 'react-icons/fa';
 import { AuthContext } from '../../AuthContext';
 
@@ -24,18 +23,10 @@ const Sidebar = ({
   meetings,
   upcomingMeetings,
   questions,
-  users,
   candidates,
 }) => {
   const { user, logout } = useContext(AuthContext);
-  const [expandedItems, setExpandedItems] = useState([]);
-
-  const toggleExpand = (itemId) => {
-    setExpandedItems(
-      (prev) =>
-        prev.includes(itemId) ? prev.filter((id) => id !== itemId) : [itemId] // Close all others and open only this one
-    );
-  };
+  const [hoveredItem, setHoveredItem] = useState(null);
 
   const menuItems = [
     {
@@ -49,25 +40,10 @@ const Sidebar = ({
       label: 'Meetings',
       icon: FaCalendarAlt,
       type: 'parent',
-      badge: meetings.length,
       children: [
-        {
-          id: 'create',
-          label: 'Create Meeting',
-          icon: FaCalendarPlus,
-        },
-        {
-          id: 'all',
-          label: 'All Meetings',
-          icon: FaList,
-          badge: meetings.length,
-        },
-        {
-          id: 'upcoming',
-          label: 'Upcoming Meetings',
-          icon: FaCalendarCheck,
-          badge: upcomingMeetings.length,
-        },
+        { id: 'create', label: 'Create Meeting', icon: FaCalendarPlus },
+        { id: 'all', label: 'All Meetings', icon: FaList },
+        { id: 'upcoming', label: 'Upcoming', icon: FaCalendarCheck },
       ],
     },
     {
@@ -75,19 +51,9 @@ const Sidebar = ({
       label: 'Questions',
       icon: FaQuestionCircle,
       type: 'parent',
-      badge: questions.length,
       children: [
-        {
-          id: 'questions',
-          label: 'All Questions',
-          icon: FaList,
-          badge: questions.length,
-        },
-        {
-          id: 'create-question',
-          label: 'Create Question',
-          icon: FaPlus,
-        },
+        { id: 'questions', label: 'All Questions', icon: FaList },
+        { id: 'create-question', label: 'Create Question', icon: FaPlus },
       ],
     },
     {
@@ -95,261 +61,268 @@ const Sidebar = ({
       label: 'Candidates',
       icon: FaUsers,
       type: 'parent',
-      badge: candidates.length,
       children: [
-        {
-          id: 'candidates',
-          label: 'All Candidates',
-          icon: FaList,
-          badge: candidates.length,
-        },
-        {
-          id: 'create-candidate',
-          label: 'Create Candidate',
-          icon: FaPlus,
-        },
+        { id: 'candidates', label: 'All Candidates', icon: FaList },
+        { id: 'create-candidate', label: 'Add Candidate', icon: FaUserPlus },
       ],
     },
-    // {
-    //   id: 'interviewers',
-    //   label: 'Interviewers',
-    //   icon: FaUsers,
-    //   type: 'single',
-    // },
   ];
+
+  const handleNavClick = (id) => {
+    setActiveTab(id);
+    if (window.innerWidth < 1024) setSidebarOpen(false);
+  };
+
+  // Tooltip Component
+  const Tooltip = ({ text, show }) => {
+    if (!show) return null;
+    return (
+      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 pointer-events-none">
+        <div className="bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+          {text}
+        </div>
+      </div>
+    );
+  };
+
+  // Collapsed Icon Button
+  const CollapsedIconButton = ({ item, isActive }) => (
+    <div className="relative">
+      <button
+        onClick={() => handleNavClick(item.id)}
+        onMouseEnter={() => setHoveredItem(item.id)}
+        onMouseLeave={() => setHoveredItem(null)}
+        className={`
+          w-10 h-10 mx-auto mb-1 flex items-center justify-center rounded-lg
+          transition-all duration-200
+          ${
+            isActive
+              ? 'bg-blue-600 text-white shadow-md'
+              : 'text-gray-500 hover:bg-blue-50 hover:text-blue-600'
+          }
+        `}
+      >
+        <item.icon size={14} />
+      </button>
+      <Tooltip text={item.label} show={hoveredItem === item.id} />
+    </div>
+  );
 
   return (
     <>
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
-      <div
+      <aside
         className={`
-        ${sidebarOpen ? 'w-64' : 'w-20'} 
-        bg-white h-screen sticky top-0 transition-all duration-300 flex flex-col shadow-lg border-r border-gray-200
-        ${sidebarOpen ? 'fixed lg:sticky' : ''} 
-        z-50
-      `}
+          ${sidebarOpen ? 'w-64' : 'w-16'} 
+          bg-white h-screen sticky top-0 
+          transition-all duration-300
+          flex flex-col border-r border-gray-200
+          ${sidebarOpen ? 'fixed lg:sticky shadow-xl lg:shadow-none' : ''} 
+          z-50
+        `}
       >
-        {/* Logo/Header */}
-        <div className="p-4 lg:p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            {sidebarOpen ? (
-              <>
-                <div>
-                  <h2 className="text-gray-800 font-bold text-lg lg:text-xl">
-                    Admin Panel
-                  </h2>
-                  <p className="text-gray-500 text-xs mt-1 hidden sm:block">
-                    Management Dashboard
-                  </p>
+        {/* Header */}
+        <div className="h-14 flex items-center justify-between px-4 border-b border-gray-100">
+          {sidebarOpen ? (
+            <>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <span className="text-white font-bold text-sm">A</span>
                 </div>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition"
-                >
-                  <FaTimes />
-                </button>
-              </>
-            ) : (
+                <div>
+                  <h1 className="text-gray-900 font-semibold text-sm">
+                    Admin Panel
+                  </h1>
+                </div>
+              </div>
               <button
-                onClick={() => setSidebarOpen(true)}
-                className="text-gray-600 hover:bg-gray-100 p-2 rounded-lg transition mx-auto"
+                onClick={() => setSidebarOpen(false)}
+                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <FaBars />
+                <FaTimes size={12} />
               </button>
-            )}
-          </div>
+            </>
+          ) : (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="w-10 h-10 mx-auto flex items-center justify-center text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <FaBars size={14} />
+            </button>
+          )}
         </div>
 
-        {/* Navigation Menu */}
-        <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isExpanded = expandedItems.includes(item.id);
+        {/* Navigation */}
+        <nav className="flex-1 py-3 overflow-y-auto">
+          {sidebarOpen ? (
+            <div className="px-3">
+              {menuItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
 
-            if (item.type === 'parent') {
-              return (
-                <div key={item.id}>
-                  {/* Parent Item */}
-                  <button
-                    onClick={() => sidebarOpen && toggleExpand(item.id)}
-                    className="w-full flex items-center gap-3 px-4 lg:px-6 py-3 text-gray-600 hover:bg-gray-50 transition-all"
-                    title={!sidebarOpen ? item.label : ''}
-                  >
-                    <Icon className="text-lg flex-shrink-0" />
-                    {sidebarOpen && (
-                      <>
-                        <span className="flex-1 text-left text-sm lg:text-base font-medium">
+                if (item.type === 'parent') {
+                  return (
+                    <div key={item.id} className="mb-4">
+                      {/* Parent Label */}
+                      <div className="flex items-center gap-2 px-3 py-2">
+                        <Icon size={12} className="text-gray-400" />
+                        <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
                           {item.label}
                         </span>
-                        {item.badge > 0 && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 mr-2">
-                            {item.badge}
-                          </span>
-                        )}
-                        {isExpanded ? (
-                          <FaChevronDown className="text-xs" />
-                        ) : (
-                          <FaChevronRight className="text-xs" />
-                        )}
-                      </>
-                    )}
-                  </button>
+                      </div>
 
-                  {/* Children Items with Tree Lines */}
-                  {sidebarOpen && isExpanded && (
-                    <div className="relative ml-6 lg:ml-9">
-                      {/* Vertical line for parent */}
-                      <div
-                        className="absolute left-0 top-0 bottom-0 w-px bg-gray-300"
-                        style={{ left: '-12px' }}
-                      ></div>
+                      {/* Children with Tree Structure */}
+                      <div className="ml-3 relative">
+                        {/* Vertical Line */}
+                        <div className="absolute left-[11px] top-0 bottom-2 w-px bg-gray-200" />
 
-                      {item.children.map((child, index) => {
-                        const ChildIcon = child.icon;
-                        const isActive = activeTab === child.id;
-                        const isLast = index === item.children.length - 1;
+                        {item.children.map((child, index) => {
+                          const ChildIcon = child.icon;
+                          const isChildActive = activeTab === child.id;
 
-                        return (
-                          <div key={child.id} className="relative">
-                            {/* Horizontal line */}
-                            <div
-                              className="absolute top-1/2 w-3 h-px bg-gray-300"
-                              style={{
-                                left: '-12px',
-                                transform: 'translateY(-50%)',
-                              }}
-                            ></div>
+                          return (
+                            <div key={child.id} className="relative">
+                              {/* Horizontal Line */}
+                              <div className="absolute left-[11px] top-1/2 w-3 h-px bg-gray-200" />
 
-                            {/* Hide vertical line for last item */}
-                            {isLast && (
+                              {/* Dot */}
                               <div
-                                className="absolute left-0 top-1/2 bottom-0 w-px bg-white"
-                                style={{ left: '-12px', zIndex: 1 }}
-                              ></div>
-                            )}
-
-                            <button
-                              onClick={() => {
-                                setActiveTab(child.id);
-                                if (window.innerWidth < 1024) {
-                                  setSidebarOpen(false);
-                                }
-                              }}
-                              className={`w-full flex items-center gap-3 pl-3 pr-4 lg:pr-6 py-2.5 transition-all relative ${
-                                isActive
-                                  ? 'bg-gray-50 text-cyan-600 font-medium'
-                                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                              }`}
-                            >
-                              {/* Active Indicator */}
-                              {isActive && (
-                                <div className="absolute -left-6 lg:-left-9 top-0 h-full w-1 bg-cyan-600"></div>
-                              )}
-
-                              <ChildIcon
-                                className={`text-sm flex-shrink-0 ${isActive ? 'text-cyan-600' : ''}`}
-                              />
-                              <span className="flex-1 text-left text-sm">
-                                {child.label}
-                              </span>
-                              {child.badge > 0 && (
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                                    isActive
-                                      ? 'bg-cyan-100 text-cyan-600'
-                                      : 'bg-gray-100 text-gray-600'
+                                className={`absolute left-[7px] top-1/2 -translate-y-1/2 w-2 h-2 rounded-full border-2 
+                                  ${
+                                    isChildActive
+                                      ? 'bg-blue-600 border-blue-600'
+                                      : 'bg-white border-gray-300'
                                   }`}
-                                >
-                                  {child.badge}
-                                </span>
-                              )}
-                            </button>
-                          </div>
-                        );
-                      })}
+                              />
+
+                              <button
+                                onClick={() => handleNavClick(child.id)}
+                                className={`
+                                  w-full flex items-center gap-3 pl-8 pr-3 py-2.5 rounded-lg text-sm
+                                  transition-all duration-200
+                                  ${
+                                    isChildActive
+                                      ? 'bg-blue-50 text-blue-600 font-medium'
+                                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                  }
+                                `}
+                              >
+                                <ChildIcon
+                                  size={13}
+                                  className={
+                                    isChildActive
+                                      ? 'text-blue-600'
+                                      : 'text-gray-400'
+                                  }
+                                />
+                                <span>{child.label}</span>
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  )}
-                </div>
-              );
-            } else {
-              // Single menu item
-              const isActive = activeTab === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    setActiveTab(item.id);
-                    if (window.innerWidth < 1024) {
-                      setSidebarOpen(false);
-                    }
-                  }}
-                  className={`w-full flex items-center gap-3 px-4 lg:px-6 py-3 transition-all relative ${
-                    isActive
-                      ? 'bg-gray-50 text-cyan-600 font-medium'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                  title={!sidebarOpen ? item.label : ''}
-                >
-                  {isActive && (
-                    <div className="absolute left-0 top-0 h-full w-1 bg-cyan-600"></div>
-                  )}
+                  );
+                }
 
-                  <Icon
-                    className={`text-lg flex-shrink-0 ${isActive ? 'text-cyan-600' : ''}`}
+                // Single Item (Dashboard)
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNavClick(item.id)}
+                    className={`
+                      w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm mb-2
+                      transition-all duration-200
+                      ${
+                        isActive
+                          ? 'bg-blue-600 text-white shadow-md'
+                          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                      }
+                    `}
+                  >
+                    <Icon size={14} />
+                    <span className="font-medium">{item.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="px-3 py-2">
+              {menuItems.map((item) => {
+                if (item.type === 'parent') {
+                  return (
+                    <div key={item.id} className="mb-3">
+                      <div className="flex justify-center mb-2">
+                        <div className="w-6 h-px bg-gray-200" />
+                      </div>
+                      {item.children.map((child) => (
+                        <CollapsedIconButton
+                          key={child.id}
+                          item={child}
+                          isActive={activeTab === child.id}
+                        />
+                      ))}
+                    </div>
+                  );
+                }
+                return (
+                  <CollapsedIconButton
+                    key={item.id}
+                    item={item}
+                    isActive={activeTab === item.id}
                   />
-                  {sidebarOpen && (
-                    <>
-                      <span className="flex-1 text-left text-sm lg:text-base">
-                        {item.label}
-                      </span>
-                      {item.badge > 0 && (
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                            isActive
-                              ? 'bg-cyan-100 text-cyan-600'
-                              : 'bg-gray-100 text-gray-600'
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </>
-                  )}
-                </button>
-              );
-            }
-          })}
-        </nav>
-
-        {/* User Info & Logout */}
-        <div className="border-t border-gray-200 p-3 lg:p-4">
-          {sidebarOpen && (
-            <div className="mb-3 px-2">
-              <div className="text-gray-800 font-medium text-sm truncate">
-                {user?.name}
-              </div>
-              <div className="text-gray-500 text-xs truncate">
-                {user?.email}
-              </div>
+                );
+              })}
             </div>
           )}
-          <button
-            onClick={logout}
-            className={`w-full flex items-center ${sidebarOpen ? 'justify-start' : 'justify-center'} gap-3 px-3 py-2.5 text-white bg-red-500 hover:bg-red-600 rounded-lg transition font-medium`}
-          >
-            <FaSignOutAlt className="text-sm flex-shrink-0" />
-            {sidebarOpen && <span className="text-sm">Logout</span>}
-          </button>
+        </nav>
+
+        {/* User Section */}
+        <div className="border-t border-gray-100 p-3">
+          {sidebarOpen ? (
+            <div className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="w-9 h-9 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-medium text-sm">
+                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-gray-900 text-sm font-medium truncate">
+                  {user?.name || 'User'}
+                </p>
+                <p className="text-gray-400 text-xs truncate">
+                  {user?.email || 'user@example.com'}
+                </p>
+              </div>
+              <button
+                onClick={logout}
+                className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                title="Logout"
+              >
+                <FaSignOutAlt size={13} />
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <button
+                onClick={logout}
+                onMouseEnter={() => setHoveredItem('logout')}
+                onMouseLeave={() => setHoveredItem(null)}
+                className="w-10 h-10 mx-auto flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              >
+                <FaSignOutAlt size={14} />
+              </button>
+              <Tooltip text="Logout" show={hoveredItem === 'logout'} />
+            </div>
+          )}
         </div>
-      </div>
+      </aside>
     </>
   );
 };

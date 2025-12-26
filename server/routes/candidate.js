@@ -1,7 +1,6 @@
+// routes/candidate.js
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 import {
   createCandidate,
   getAllCandidates,
@@ -19,37 +18,24 @@ import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Ensure uploads directory exists
-const uploadsDir = 'uploads/';
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname)
-    );
-  },
-});
+// ✅ Memory Storage - NO temp files created!
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  // Accept photos
   if (file.fieldname === 'photo') {
-    if (['image/jpeg', 'image/png', 'image/gif'].includes(file.mimetype)) {
+    if (
+      ['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(
+        file.mimetype
+      )
+    ) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed for photo'), false);
+      cb(
+        new Error('Only image files (JPEG, PNG, GIF, WEBP) are allowed'),
+        false
+      );
     }
-  }
-  // Accept resumes (PDF, DOC, DOCX)
-  else if (file.fieldname === 'resume') {
+  } else if (file.fieldname === 'resume') {
     if (
       [
         'application/pdf',
@@ -59,53 +45,69 @@ const fileFilter = (req, file, cb) => {
     ) {
       cb(null, true);
     } else {
-      cb(new Error('Only PDF or DOC files are allowed for resume'), false);
+      cb(new Error('Only PDF or DOC files are allowed'), false);
     }
+  } else {
+    cb(null, true);
   }
 };
 
 const upload = multer({
-  storage,
+  storage, // Memory storage
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB
   },
 });
 
-// Routes
-router.post(
-  '/create',
-  upload.fields([
-    { name: 'photo', maxCount: 1 },
-    { name: 'resume', maxCount: 1 },
-  ]),
-  createCandidate
-);
+// Error handler
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({
+        success: false,
+        message: 'File size too large. Maximum size is 10MB',
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+  if (err) {
+    return res.status(400).json({
+      success: false,
+      message: err.message,
+    });
+  }
+  next();
+};
 
+const uploadFields = upload.fields([
+  { name: 'photo', maxCount: 1 },
+  { name: 'resume', maxCount: 1 },
+]);
+
+// Routes
+router.post('/create', uploadFields, handleMulterError, createCandidate);
 router.get('/all', getAllCandidates);
 router.get('/:id', getCandidateById);
-
-router.put(
-  '/:id',
-  upload.fields([
-    { name: 'photo', maxCount: 1 },
-    { name: 'resume', maxCount: 1 },
-  ]),
-  updateCandidate
-);
-
+router.put('/:id', uploadFields, handleMulterError, updateCandidate);
 router.delete('/:id', deleteCandidate);
 
-// Candidate profile routes (require authentication)
 router.get('/profile/me', requireAuth, getMyProfile);
-router.put('/profile/me', requireAuth, updateMyProfile);
+router.put(
+  '/profile/me',
+  requireAuth,
+  uploadFields,
+  handleMulterError,
+  updateMyProfile
+);
 
-// Password management routes
-router.post('/password/reset', resetPassword); // Admin can reset password
-router.put('/password/update', requireAuth, updatePassword); // Candidate can update their own password
+router.post('/password/reset', resetPassword);
+router.put('/password/update', requireAuth, updatePassword);
 
-// Approval routes (Admin)
-router.post('/:candidateId/approve', approveCandidate); // Approve candidate
-router.post('/:candidateId/reject', rejectCandidate); // Reject candidate
+router.post('/:candidateId/approve', approveCandidate);
+router.post('/:candidateId/reject', rejectCandidate);
 
 export default router;

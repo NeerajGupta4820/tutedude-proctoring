@@ -1,7 +1,18 @@
+// controllers/candidateController.js
 import Candidate from '../models/Candidate.js';
 import { ApiError } from '../middleware/errorHandler.js';
+import {
+  uploadToCloudinary,
+  deleteFromCloudinary,
+} from '../utils/cloudinaryUpload.js';
 
-// Create a new candidate
+// Cloudinary folder structure
+const CLOUDINARY_FOLDERS = {
+  photo: 'tutedude/profile',
+  resume: 'tutedude/resume',
+};
+
+// Create candidate
 export const createCandidate = async (req, res, next) => {
   try {
     const {
@@ -16,7 +27,15 @@ export const createCandidate = async (req, res, next) => {
       notes,
       password,
     } = req.body;
-    console.log(req.body, 'body');
+
+    console.log('📝 Creating candidate:', { name, email });
+    console.log('📎 Files received:', {
+      photo: req.files?.photo?.[0] ? `${req.files.photo[0].size} bytes` : 'No',
+      resume: req.files?.resume?.[0]
+        ? `${req.files.resume[0].size} bytes`
+        : 'No',
+    });
+
     // Validate required fields
     if (!name || !email) {
       return next(new ApiError(400, 'Name and email are required'));
@@ -26,33 +45,73 @@ export const createCandidate = async (req, res, next) => {
     const existingCandidate = await Candidate.findOne({
       email: email.toLowerCase(),
     });
+
     if (existingCandidate) {
       return next(
         new ApiError(409, 'Candidate with this email already exists')
       );
     }
 
-    // Handle file uploads
-    let photoPath = null;
-    let resumePath = null;
+    // Parallel upload to Cloudinary
+    let photoResult = null;
+    let resumeResult = null;
+    const uploadPromises = [];
 
-    if (req.files) {
-      if (req.files.photo) {
-        photoPath = req.files.photo[0].path;
-      }
-      if (req.files.resume) {
-        resumePath = req.files.resume[0].path;
-      }
+    // Photo upload
+    if (req.files?.photo?.[0]?.buffer) {
+      console.log('📸 Uploading photo to Cloudinary...');
+      uploadPromises.push(
+        uploadToCloudinary(
+          req.files.photo[0].buffer,
+          CLOUDINARY_FOLDERS.photo,
+          'image'
+        )
+          .then((result) => {
+            photoResult = result;
+            console.log('✅ Photo uploaded:', result.url);
+          })
+          .catch((err) => {
+            console.error('❌ Photo upload failed:', err.message);
+          })
+      );
     }
 
-    // Create candidate
+    // Resume upload
+    if (req.files?.resume?.[0]?.buffer) {
+      console.log('📄 Uploading resume to Cloudinary...');
+      uploadPromises.push(
+        uploadToCloudinary(
+          req.files.resume[0].buffer,
+          CLOUDINARY_FOLDERS.resume,
+          'raw'
+        )
+          .then((result) => {
+            resumeResult = result;
+            console.log('✅ Resume uploaded:', result.url);
+          })
+          .catch((err) => {
+            console.error('❌ Resume upload failed:', err.message);
+          })
+      );
+    }
+
+    // Wait for all uploads
+    if (uploadPromises.length > 0) {
+      console.log('⏳ Waiting for uploads to complete...');
+      await Promise.all(uploadPromises);
+      console.log('✅ All uploads completed');
+    }
+
+    // Create candidate document
     const candidate = new Candidate({
       name: name.trim(),
       email: email.toLowerCase().trim(),
       phone: phone?.trim() || '',
       description: description?.trim() || '',
-      photo: photoPath,
-      resume: resumePath,
+      photo: photoResult?.url || null,
+      photoPublicId: photoResult?.publicId || null,
+      resume: resumeResult?.url || null,
+      resumePublicId: resumeResult?.publicId || null,
       position: position?.trim() || '',
       experience: experience?.trim() || 'fresher',
       status: status?.trim() || 'pending',
@@ -63,14 +122,21 @@ export const createCandidate = async (req, res, next) => {
     });
 
     await candidate.save();
+    console.log('✅ Candidate saved:', candidate._id);
+
+    // Prepare response (hide sensitive fields)
+    const response = candidate.toObject();
+    delete response.password;
+    delete response.photoPublicId;
+    delete response.resumePublicId;
 
     res.status(201).json({
       success: true,
       message: 'Candidate created successfully',
-      data: candidate,
+      data: response,
     });
   } catch (error) {
-    console.error('Error creating candidate:', error);
+    console.error('❌ Error creating candidate:', error);
     next(error);
   }
 };
@@ -78,21 +144,32 @@ export const createCandidate = async (req, res, next) => {
 // Get all candidates
 export const getAllCandidates = async (req, res, next) => {
   try {
-    const { status, experience, position } = req.query;
+    const { status, experience, position, search } = req.query;
 
-    // Build filter
     const filter = {};
     if (status) filter.status = status;
     if (experience) filter.experience = experience;
-    if (position) filter.position = position;
+    if (position) filter.position = { $regex: position, $options: 'i' };
 
-    const candidates = await Candidate.find(filter).sort({ createdAt: -1 });
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { position: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const candidates = await Candidate.find(filter)
+      .select('-password -photoPublicId -resumePublicId')
+      .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
+      count: candidates.length,
       data: candidates,
     });
   } catch (error) {
+    console.error('❌ Error getting candidates:', error);
     next(error);
   }
 };
@@ -102,7 +179,10 @@ export const getCandidateById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const candidate = await Candidate.findById(id);
+    const candidate = await Candidate.findById(id).select(
+      '-password -photoPublicId -resumePublicId'
+    );
+
     if (!candidate) {
       return next(new ApiError(404, 'Candidate not found'));
     }
@@ -112,6 +192,7 @@ export const getCandidateById = async (req, res, next) => {
       data: candidate,
     });
   } catch (error) {
+    console.error('❌ Error getting candidate:', error);
     next(error);
   }
 };
@@ -120,81 +201,197 @@ export const getCandidateById = async (req, res, next) => {
 export const updateCandidate = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const {
-      name,
-      email,
-      phone,
-      description,
-      position,
-      experience,
-      status,
-      interviewDate,
-      notes,
-    } = req.body;
+    const updateData = req.body;
 
-    const candidate = await Candidate.findById(id);
+    console.log('📝 Updating candidate:', id);
+    console.log('📎 Files received:', {
+      photo: req.files?.photo?.[0] ? 'Yes' : 'No',
+      resume: req.files?.resume?.[0] ? 'Yes' : 'No',
+    });
+
+    // Get candidate with public IDs for deletion
+    const candidate = await Candidate.findById(id).select(
+      '+photoPublicId +resumePublicId'
+    );
+
     if (!candidate) {
       return next(new ApiError(404, 'Candidate not found'));
     }
 
-    // Update fields
-    if (name) candidate.name = name.trim();
-    if (email) candidate.email = email.toLowerCase().trim();
-    if (phone) candidate.phone = phone.trim();
-    if (description) candidate.description = description.trim();
-    if (position) candidate.position = position.trim();
-    if (experience) candidate.experience = experience;
-    if (status) candidate.status = status;
-    if (interviewDate) candidate.interviewDate = interviewDate;
-    if (notes) candidate.notes = notes.trim();
+    // Update text fields
+    const allowedFields = [
+      'name',
+      'email',
+      'phone',
+      'description',
+      'position',
+      'experience',
+      'status',
+      'interviewDate',
+      'notes',
+    ];
 
-    // Update file paths if new files are uploaded
-    if (req.files) {
-      if (req.files.photo) {
-        candidate.photo = req.files.photo[0].path;
+    allowedFields.forEach((field) => {
+      if (updateData[field] !== undefined) {
+        if (field === 'email') {
+          candidate[field] = updateData[field].toLowerCase().trim();
+        } else if (typeof updateData[field] === 'string') {
+          candidate[field] = updateData[field].trim();
+        } else {
+          candidate[field] = updateData[field];
+        }
       }
-      if (req.files.resume) {
-        candidate.resume = req.files.resume[0].path;
-      }
+    });
+
+    // Handle file uploads (parallel)
+    const uploadPromises = [];
+
+    // Update photo
+    if (req.files?.photo?.[0]?.buffer) {
+      uploadPromises.push(
+        (async () => {
+          // Delete old photo from Cloudinary
+          if (candidate.photoPublicId) {
+            console.log('🗑️ Deleting old photo:', candidate.photoPublicId);
+            await deleteFromCloudinary(candidate.photoPublicId, 'image');
+          }
+
+          // Upload new photo
+          console.log('📸 Uploading new photo...');
+          const result = await uploadToCloudinary(
+            req.files.photo[0].buffer,
+            CLOUDINARY_FOLDERS.photo,
+            'image'
+          );
+          candidate.photo = result.url;
+          candidate.photoPublicId = result.publicId;
+          console.log('✅ Photo updated:', result.url);
+        })()
+      );
+    }
+
+    // Update resume
+    if (req.files?.resume?.[0]?.buffer) {
+      uploadPromises.push(
+        (async () => {
+          // Delete old resume from Cloudinary
+          if (candidate.resumePublicId) {
+            console.log('🗑️ Deleting old resume:', candidate.resumePublicId);
+            await deleteFromCloudinary(candidate.resumePublicId, 'raw');
+          }
+
+          // Upload new resume
+          console.log('📄 Uploading new resume...');
+          const result = await uploadToCloudinary(
+            req.files.resume[0].buffer,
+            CLOUDINARY_FOLDERS.resume,
+            'raw'
+          );
+          candidate.resume = result.url;
+          candidate.resumePublicId = result.publicId;
+          console.log('✅ Resume updated:', result.url);
+        })()
+      );
+    }
+
+    // Wait for all uploads
+    if (uploadPromises.length > 0) {
+      await Promise.all(uploadPromises);
     }
 
     await candidate.save();
+    console.log('✅ Candidate updated:', candidate._id);
+
+    // Prepare response
+    const response = candidate.toObject();
+    delete response.password;
+    delete response.photoPublicId;
+    delete response.resumePublicId;
 
     res.status(200).json({
       success: true,
       message: 'Candidate updated successfully',
-      data: candidate,
+      data: response,
     });
   } catch (error) {
+    console.error('❌ Error updating candidate:', error);
     next(error);
   }
 };
 
-// Delete candidate
+// Delete candidate (with Cloudinary cleanup)
 export const deleteCandidate = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const candidate = await Candidate.findByIdAndDelete(id);
+    console.log('🗑️ Deleting candidate:', id);
+
+    // Get candidate with public IDs
+    const candidate = await Candidate.findById(id).select(
+      '+photoPublicId +resumePublicId'
+    );
+
     if (!candidate) {
       return next(new ApiError(404, 'Candidate not found'));
     }
 
+    // Delete files from Cloudinary (parallel)
+    const deletePromises = [];
+
+    if (candidate.photoPublicId) {
+      console.log(
+        '🗑️ Deleting photo from Cloudinary:',
+        candidate.photoPublicId
+      );
+      deletePromises.push(
+        deleteFromCloudinary(candidate.photoPublicId, 'image')
+          .then(() => console.log('✅ Photo deleted'))
+          .catch((err) => console.error('❌ Photo delete failed:', err.message))
+      );
+    }
+
+    if (candidate.resumePublicId) {
+      console.log(
+        '🗑️ Deleting resume from Cloudinary:',
+        candidate.resumePublicId
+      );
+      deletePromises.push(
+        deleteFromCloudinary(candidate.resumePublicId, 'raw')
+          .then(() => console.log('✅ Resume deleted'))
+          .catch((err) =>
+            console.error('❌ Resume delete failed:', err.message)
+          )
+      );
+    }
+
+    // Wait for Cloudinary deletions
+    if (deletePromises.length > 0) {
+      await Promise.all(deletePromises);
+    }
+
+    // Delete candidate from database
+    await Candidate.findByIdAndDelete(id);
+    console.log('✅ Candidate deleted from database');
+
     res.status(200).json({
       success: true,
-      message: 'Candidate deleted successfully',
+      message: 'Candidate and associated files deleted successfully',
     });
   } catch (error) {
+    console.error('❌ Error deleting candidate:', error);
     next(error);
   }
 };
 
-// Get my profile (Candidate)
+// Get my profile
 export const getMyProfile = async (req, res, next) => {
   try {
     const candidateId = req.user.id;
 
-    const candidate = await Candidate.findById(candidateId);
+    const candidate = await Candidate.findById(candidateId).select(
+      '-password -photoPublicId -resumePublicId'
+    );
+
     if (!candidate) {
       return next(new ApiError(404, 'Candidate not found'));
     }
@@ -208,31 +405,80 @@ export const getMyProfile = async (req, res, next) => {
   }
 };
 
-// Update my profile (Candidate)
+// Update my profile
 export const updateMyProfile = async (req, res, next) => {
   try {
     const candidateId = req.user.id;
     const { name, phone, position, experience, description, notes } = req.body;
 
-    const candidate = await Candidate.findById(candidateId);
+    const candidate = await Candidate.findById(candidateId).select(
+      '+photoPublicId +resumePublicId'
+    );
+
     if (!candidate) {
       return next(new ApiError(404, 'Candidate not found'));
     }
 
     // Update allowed fields
     if (name) candidate.name = name.trim();
-    if (phone) candidate.phone = phone.trim();
-    if (position) candidate.position = position.trim();
+    if (phone !== undefined) candidate.phone = phone.trim();
+    if (position !== undefined) candidate.position = position.trim();
     if (experience) candidate.experience = experience;
-    if (description) candidate.description = description.trim();
-    if (notes) candidate.notes = notes.trim();
+    if (description !== undefined) candidate.description = description.trim();
+    if (notes !== undefined) candidate.notes = notes.trim();
+
+    // Handle file uploads (parallel)
+    const uploadPromises = [];
+
+    if (req.files?.photo?.[0]?.buffer) {
+      uploadPromises.push(
+        (async () => {
+          if (candidate.photoPublicId) {
+            await deleteFromCloudinary(candidate.photoPublicId, 'image');
+          }
+          const result = await uploadToCloudinary(
+            req.files.photo[0].buffer,
+            CLOUDINARY_FOLDERS.photo,
+            'image'
+          );
+          candidate.photo = result.url;
+          candidate.photoPublicId = result.publicId;
+        })()
+      );
+    }
+
+    if (req.files?.resume?.[0]?.buffer) {
+      uploadPromises.push(
+        (async () => {
+          if (candidate.resumePublicId) {
+            await deleteFromCloudinary(candidate.resumePublicId, 'raw');
+          }
+          const result = await uploadToCloudinary(
+            req.files.resume[0].buffer,
+            CLOUDINARY_FOLDERS.resume,
+            'raw'
+          );
+          candidate.resume = result.url;
+          candidate.resumePublicId = result.publicId;
+        })()
+      );
+    }
+
+    if (uploadPromises.length > 0) {
+      await Promise.all(uploadPromises);
+    }
 
     await candidate.save();
+
+    const response = candidate.toObject();
+    delete response.password;
+    delete response.photoPublicId;
+    delete response.resumePublicId;
 
     res.status(200).json({
       success: true,
       message: 'Profile updated successfully',
-      data: candidate,
+      data: response,
     });
   } catch (error) {
     next(error);
@@ -261,14 +507,13 @@ export const resetPassword = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Password reset successfully',
-      data: candidate,
     });
   } catch (error) {
     next(error);
   }
 };
 
-// Update own password (by candidate)
+// Update password (Candidate)
 export const updatePassword = async (req, res, next) => {
   try {
     const candidateId = req.user.id;
@@ -283,13 +528,11 @@ export const updatePassword = async (req, res, next) => {
       return next(new ApiError(404, 'Candidate not found'));
     }
 
-    // Verify old password
-    const isPasswordValid = await candidate.matchPassword(oldPassword);
-    if (!isPasswordValid) {
+    const isValid = await candidate.matchPassword(oldPassword);
+    if (!isValid) {
       return next(new ApiError(400, 'Old password is incorrect'));
     }
 
-    // Set new password
     candidate.password = newPassword;
     await candidate.save();
 
@@ -302,7 +545,7 @@ export const updatePassword = async (req, res, next) => {
   }
 };
 
-// Approve candidate (Admin)
+// Approve candidate
 export const approveCandidate = async (req, res, next) => {
   try {
     const { candidateId } = req.params;
@@ -314,8 +557,8 @@ export const approveCandidate = async (req, res, next) => {
     const candidate = await Candidate.findByIdAndUpdate(
       candidateId,
       { isApproved: true },
-      { new: true, runValidators: true }
-    );
+      { new: true }
+    ).select('-password -photoPublicId -resumePublicId');
 
     if (!candidate) {
       return next(new ApiError(404, 'Candidate not found'));
@@ -331,7 +574,7 @@ export const approveCandidate = async (req, res, next) => {
   }
 };
 
-// Reject candidate (Admin)
+// Reject candidate
 export const rejectCandidate = async (req, res, next) => {
   try {
     const { candidateId } = req.params;
@@ -343,8 +586,8 @@ export const rejectCandidate = async (req, res, next) => {
     const candidate = await Candidate.findByIdAndUpdate(
       candidateId,
       { isApproved: false },
-      { new: true, runValidators: true }
-    );
+      { new: true }
+    ).select('-password -photoPublicId -resumePublicId');
 
     if (!candidate) {
       return next(new ApiError(404, 'Candidate not found'));

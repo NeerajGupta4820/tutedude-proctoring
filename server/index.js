@@ -1,3 +1,4 @@
+// index.js
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,22 +13,30 @@ import reportRoutes from './routes/report.js';
 import meetingRoutes from './routes/meeting.js';
 import questionRoutes from './routes/question.js';
 import connectDB from './db/dbconfig.js';
-import { ApiError } from './middleware/errorHandler.js';
 
 dotenv.config();
 
 const app = express();
 
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
+
 app.use(
   cors({
     origin: 'http://localhost:3000',
     credentials: true,
   })
 );
-app.use(express.json());
-app.use(express.static('uploads'));
 
+app.use(express.json());
+
+// No need for static files now - Cloudinary serves them!
+// app.use(express.static('uploads')); // REMOVED
+
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/candidate', candidateRoutes);
 app.use('/api/interviewer', interviewerRoutes);

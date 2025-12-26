@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import DashboardHome from './DashboardHome';
-import CreateMeeting from './CreateMeeting';
-import AllMeetings from './AllMeetings';
-import UpcomingMeetings from './UpcomingMeetings';
-import QuestionManager from './QuestionManager';
-import CreateQuestion from './CreateQuestion';
-import CandidateManagement from './CandidateManagement';
-import CreateCandidate from './CreateCandidate';
+import DashboardHome from './Dashboard/DashboardHome';
+import CreateMeeting from './MeetingManager/CreateMeeting';
+import AllMeetings from './MeetingManager/AllMeetings';
+import UpcomingMeetings from './MeetingManager/UpcomingMeetings';
+import QuestionManager from './QuestionManager/QuestionManager';
+import CreateQuestion from './QuestionManager/CreateQuestion';
+import UpdateQuestion from './QuestionManager/UpdateQuestion';
+import CandidateManagement from './CandidateManager/CandidateManagement';
+import CreateCandidate from './CandidateManager/CreateCandidate';
+import UpdateCandidate from './CandidateManager/UpdateCandidate';
+import CandidateProfile from './CandidateManager/CandidateProfile';
 import InterviewerManagement from './InterviewerManagement';
 
 const ContentBox = ({
@@ -22,14 +25,46 @@ const ContentBox = ({
 }) => {
   const navigate = useNavigate();
   const [editingQuestion, setEditingQuestion] = useState(null);
+  const [editingCandidate, setEditingCandidate] = useState(null);
+  const [viewingCandidate, setViewingCandidate] = useState(null);
 
+  // Question handlers
   const handleEditQuestion = (question) => {
     setEditingQuestion(question);
-    setActiveTab('create-question');
+    setActiveTab('edit-question');
+  };
+
+  // Candidate handlers
+  const handleEditCandidate = (candidate) => {
+    setEditingCandidate(candidate);
+    setActiveTab('edit-candidate');
+  };
+
+  const handleViewCandidate = (candidate) => {
+    setViewingCandidate(candidate);
+    setActiveTab('view-candidate');
+  };
+
+  const handleCandidateUpdated = () => {
+    onUpdate();
+    setEditingCandidate(null);
+    setActiveTab('candidates');
+  };
+
+  const handleCandidateViewClose = () => {
+    setViewingCandidate(null);
+    setActiveTab('candidates');
+  };
+
+  const handleCandidateEditFromView = () => {
+    setEditingCandidate(viewingCandidate);
+    setViewingCandidate(null);
+    setActiveTab('edit-candidate');
   };
 
   return (
     <div className="flex-1 overflow-auto p-6">
+      {/* Dashboard */}
       {activeTab === 'dashboard' && (
         <DashboardHome
           users={users}
@@ -40,6 +75,7 @@ const ContentBox = ({
         />
       )}
 
+      {/* Meeting Management */}
       {activeTab === 'create' && (
         <div className="bg-white rounded-lg shadow p-6">
           <CreateMeeting
@@ -58,6 +94,7 @@ const ContentBox = ({
         <AllMeetings meetings={meetings} navigate={navigate} />
       )}
 
+      {/* Question Management */}
       {activeTab === 'questions' && (
         <QuestionManager
           questions={questions}
@@ -68,7 +105,17 @@ const ContentBox = ({
 
       {activeTab === 'create-question' && (
         <CreateQuestion
-          editingQuestion={editingQuestion}
+          onUpdate={() => {
+            onUpdate();
+            setActiveTab('questions');
+          }}
+          onCancel={() => setActiveTab('questions')}
+        />
+      )}
+
+      {activeTab === 'edit-question' && editingQuestion && (
+        <UpdateQuestion
+          question={editingQuestion}
           onUpdate={() => {
             onUpdate();
             setActiveTab('questions');
@@ -81,8 +128,14 @@ const ContentBox = ({
         />
       )}
 
+      {/* Candidate Management */}
       {activeTab === 'candidates' && (
-        <CandidateManagement candidates={candidates} onUpdate={onUpdate} />
+        <CandidateManagement
+          candidates={candidates}
+          onUpdate={onUpdate}
+          onEdit={handleEditCandidate}
+          onView={handleViewCandidate}
+        />
       )}
 
       {activeTab === 'create-candidate' && (
@@ -91,9 +144,31 @@ const ContentBox = ({
             onUpdate();
             setActiveTab('candidates');
           }}
+          onCancel={() => setActiveTab('candidates')}
         />
       )}
 
+      {activeTab === 'edit-candidate' && editingCandidate && (
+        <UpdateCandidate
+          candidate={editingCandidate}
+          onUpdate={handleCandidateUpdated}
+          onCancel={() => {
+            setEditingCandidate(null);
+            setActiveTab('candidates');
+          }}
+        />
+      )}
+
+      {activeTab === 'view-candidate' && viewingCandidate && (
+        <CandidateProfile
+          candidate={viewingCandidate}
+          onBack={handleCandidateViewClose}
+          onEdit={handleCandidateEditFromView}
+          onUpdate={onUpdate}
+        />
+      )}
+
+      {/* Interviewer Management */}
       {activeTab === 'interviewers' && (
         <InterviewerManagement onUpdate={onUpdate} />
       )}
