@@ -16,8 +16,8 @@ import {
   FaEye,
   FaFilePdf,
 } from 'react-icons/fa';
-import ImagePreviewModal from './ImagePreviewModal';
-import ResumePreviewModal from './ResumePreviewModal';
+import ImagePreviewModal from '../../../../../dialogs/ImagePreviewModal';
+import ResumePreviewModal from '../../../../../dialogs/ResumePreviewModal';
 
 const CandidateProfile = ({ candidate, onBack, onEdit, onDelete }) => {
   const [showImagePreview, setShowImagePreview] = useState(false);

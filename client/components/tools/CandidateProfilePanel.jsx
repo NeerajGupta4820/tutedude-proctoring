@@ -14,7 +14,7 @@ import {
   FaFilePdf,
 } from 'react-icons/fa';
 import ImagePreviewModal from '../../components/admin/admindashboard/mainlayout/contentbox/CandidateManager/CandidateProfile';
-import ResumePreviewModal from '../../components/admin/admindashboard/mainlayout/contentbox/CandidateManager/ResumePreviewModal';
+import ResumePreviewModal from '../dialogs/ResumePreviewModal';
 
 const CandidateProfilePanel = ({ candidate, onClose }) => {
   const [showImagePreview, setShowImagePreview] = useState(false);

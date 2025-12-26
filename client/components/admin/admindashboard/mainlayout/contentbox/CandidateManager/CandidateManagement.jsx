@@ -19,7 +19,7 @@ import {
   FaUserPlus,
   FaEye,
 } from 'react-icons/fa';
-import ImagePreviewModal from './ImagePreviewModal';
+import ImagePreviewModal from '../../../../../dialogs/ImagePreviewModal';
 
 const API_URL = 'http://localhost:5000/api';
 
