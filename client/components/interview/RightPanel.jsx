@@ -1,3 +1,4 @@
+// components/interview/RightPanel.jsx
 import React from 'react';
 import CodeEditor from '../tools/CodeEditor';
 import QuestionPanel from '../tools/QuestionPanel';
@@ -9,30 +10,23 @@ import ResumePanel from '../tools/ResumePanel';
 const RightPanel = ({
   activePanel,
   setActivePanel,
-  // Code Editor props
   currentQuestion,
   code,
   setCode,
   language,
   setLanguage,
-  // Question Panel props
   questions,
   currentQuestionIndex,
   setCurrentQuestionIndex,
-  // Chat Panel props
-  chatMessages,
-  handleSendMessage,
-  user,
-  // Whiteboard props
-  actualRoomId,
+  meetingId,
   socket,
-  // Candidate props
+  user,
+  participants, // Add this prop
   candidateData,
   loadingCandidate,
 }) => {
   if (!activePanel) return null;
 
-  // ✅ Define isAdmin here using the user prop
   const isAdmin = user?.role === 'admin';
 
   return (
@@ -60,9 +54,10 @@ const RightPanel = ({
 
       {activePanel === 'chat' && (
         <ChatPanel
-          messages={chatMessages}
-          onSendMessage={handleSendMessage}
+          meetingId={meetingId}
+          socket={socket}
           currentUser={user}
+          participants={participants} // Pass participants here
           onClose={() => setActivePanel(null)}
         />
       )}
@@ -70,7 +65,7 @@ const RightPanel = ({
       {activePanel === 'whiteboard' && (
         <WhiteboardPanel
           onClose={() => setActivePanel(null)}
-          meetingId={actualRoomId}
+          meetingId={meetingId}
           socket={socket}
         />
       )}
@@ -83,7 +78,6 @@ const RightPanel = ({
         />
       )}
 
-      {/* ✅ Fixed: Use isAdmin and user instead of undefined variables */}
       {activePanel === 'resume' && (
         <ResumePanel
           candidate={isAdmin ? candidateData : null}

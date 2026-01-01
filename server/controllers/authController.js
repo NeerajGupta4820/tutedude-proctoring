@@ -1,5 +1,5 @@
-import User from '../models/User.js';
-import Candidate from '../models/Candidate.js';
+import User from '../models/UserSchema.js';
+import Candidate from '../models/CandidateSchema.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
@@ -82,12 +82,10 @@ export const login = async (req, res) => {
 
       // Check if password is set
       if (!candidate.password) {
-        return res
-          .status(400)
-          .json({
-            message:
-              'Your account is not yet activated. Contact your interviewer.',
-          });
+        return res.status(400).json({
+          message:
+            'Your account is not yet activated. Contact your interviewer.',
+        });
       }
 
       // Verify password

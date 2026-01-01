@@ -1,3 +1,4 @@
+// pages/InterviewScreen.jsx
 import React, {
   useState,
   useRef,
@@ -10,14 +11,12 @@ import { AuthContext } from '../components/AuthContext';
 import { io } from 'socket.io-client';
 import axios from 'axios';
 
-// ✅ Import Interview Components
 import InterviewHeader from '../components/interview/InterviewHeader';
 import VideoSection from '../components/interview/VideoSection';
 import BottomControls from '../components/interview/BottomControls';
 import RightPanel from '../components/interview/RightPanel';
 import ToolsBar from '../components/tools/ToolsBar';
 
-// ✅ ICE Server Configuration
 const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -28,7 +27,6 @@ const ICE_SERVERS = {
   iceCandidatePoolSize: 10,
 };
 
-// ✅ API Base URL
 const API_BASE_URL = 'http://localhost:5000/api';
 
 const InterviewScreen = () => {
@@ -37,18 +35,17 @@ const InterviewScreen = () => {
   const navigate = useNavigate();
   const navState = location.state || {};
 
-  // URL params
   const searchParams = new URLSearchParams(location.search);
   const meetingId =
     searchParams.get('meetingId') || navState.meetingId || 'default_meeting';
 
-  // ✅ UI States
+  // UI States
   const [layout, setLayout] = useState('speaker');
   const [showParticipants, setShowParticipants] = useState(false);
   const [activePanel, setActivePanel] = useState(null);
   const [timer, setTimer] = useState('00:00');
 
-  // ✅ Media States
+  // Media States
   const [camOn, setCamOn] = useState(
     navState.cameraOn !== undefined ? navState.cameraOn : false
   );
@@ -58,27 +55,28 @@ const InterviewScreen = () => {
   const [localStream, setLocalStream] = useState(null);
   const [permissionError, setPermissionError] = useState('');
 
-  // ✅ Meeting States
+  // Meeting States
   const [meetingData, setMeetingData] = useState(null);
   const [actualRoomId, setActualRoomId] = useState(null);
   const [candidateData, setCandidateData] = useState(null);
   const [loadingCandidate, setLoadingCandidate] = useState(false);
 
-  // ✅ Questions States
+  // Questions States
   const [questions, setQuestions] = useState([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [language, setLanguage] = useState('javascript');
   const [code, setCode] = useState('');
 
-  // ✅ Connection States
+  // Connection States
   const [isConnected, setIsConnected] = useState(false);
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [participants, setParticipants] = useState([]);
   const [remoteStreams, setRemoteStreams] = useState({});
   const [connectionStates, setConnectionStates] = useState({});
-  const [chatMessages, setChatMessages] = useState([]);
 
-  // ✅ Refs
+  // REMOVED: chatMessages state - now handled in ChatPanel
+
+  // Refs
   const videoRef = useRef(null);
   const localStreamRef = useRef(null);
   const socketRef = useRef(null);
@@ -87,7 +85,7 @@ const InterviewScreen = () => {
   const remoteVideoRefs = useRef({});
 
   // ============================================
-  // ✅ TIMER EFFECT
+  // TIMER EFFECT
   // ============================================
   useEffect(() => {
     const startTime = Date.now();
@@ -103,110 +101,52 @@ const InterviewScreen = () => {
   }, []);
 
   // ============================================
-  // ✅ FETCH MEETING DATA & CANDIDATE DATA
+  // FETCH MEETING DATA & CANDIDATE DATA
   // ============================================
   useEffect(() => {
     const headers = {
       Authorization: `Bearer ${localStorage.getItem('token')}`,
     };
 
-    // ✅ FETCH FULL CANDIDATE DATA FROM API
     const fetchCandidateData = async (meeting) => {
       setLoadingCandidate(true);
       console.log('🔍 Starting candidate data fetch...');
-      console.log('📋 Meeting candidate field:', meeting.candidate);
 
       try {
         let candidateId = null;
         let candidate = null;
 
-        // Step 1: Extract candidate ID from meeting
         if (meeting.candidate) {
           if (typeof meeting.candidate === 'object' && meeting.candidate._id) {
             candidateId = meeting.candidate._id;
-            console.log('📋 Got candidate ID from populated object:', candidateId);
           } else if (typeof meeting.candidate === 'string') {
             candidateId = meeting.candidate;
-            console.log('📋 Got candidate ID from string:', candidateId);
           }
         }
 
-        // Step 2: ALWAYS fetch full candidate data from /candidate/:id API
         if (candidateId) {
-          console.log('🌐 Fetching full candidate data from API...');
-          console.log('🌐 API URL:', `${API_BASE_URL}/candidate/${candidateId}`);
-
           try {
             const res = await axios.get(
               `${API_BASE_URL}/candidate/${candidateId}`,
               { headers }
             );
 
-            console.log('✅ API Response:', res.data);
-
             if (res.data.success && res.data.data) {
               candidate = res.data.data;
-              console.log('✅ Full candidate data received:', {
-                _id: candidate._id,
-                name: candidate.name,
-                email: candidate.email,
-                phone: candidate.phone,
-                position: candidate.position,
-                experience: candidate.experience,
-                photo: candidate.photo ? '✅ Has Photo' : '❌ No Photo',
-                resume: candidate.resume ? '✅ Has Resume' : '❌ No Resume',
-                status: candidate.status,
-                isApproved: candidate.isApproved,
-              });
-            } else {
-              console.log('⚠️ API returned success:false or no data');
             }
           } catch (apiError) {
-            console.error('❌ Error fetching candidate from API:', apiError.message);
-
-            // Fallback to populated data if API fails
+            console.error('Error fetching candidate:', apiError.message);
             if (meeting.candidate && typeof meeting.candidate === 'object') {
               candidate = meeting.candidate;
-              console.log('⚠️ Using populated data as fallback');
-            }
-          }
-        } else {
-          console.log('⚠️ No candidate ID found in meeting');
-        }
-
-        // Step 3: If still no candidate, try from meeting.user
-        if (!candidate && meeting.user) {
-          console.log('🔍 Trying to get candidate from meeting.user...');
-          let userId = null;
-
-          if (typeof meeting.user === 'object' && meeting.user._id) {
-            userId = meeting.user._id;
-          } else if (typeof meeting.user === 'string') {
-            userId = meeting.user;
-          }
-
-          if (userId) {
-            try {
-              const res = await axios.get(
-                `${API_BASE_URL}/candidate/${userId}`,
-                { headers }
-              );
-              if (res.data.success && res.data.data) {
-                candidate = res.data.data;
-                console.log('✅ Candidate fetched from user ID:', candidate.name);
-              }
-            } catch (err) {
-              console.error('❌ Error fetching from user ID:', err.message);
             }
           }
         }
 
-        // Step 4: Final fallback
         if (!candidate) {
-          console.log('⚠️ Creating fallback candidate data');
           candidate = {
             _id: meeting.candidate?._id || 'unknown',
-            name: meeting.candidate?.name || meeting.candidateName || 'Candidate',
+            name:
+              meeting.candidate?.name || meeting.candidateName || 'Candidate',
             email: meeting.candidate?.email || meeting.candidateEmail || 'N/A',
             phone: meeting.candidate?.phone || '',
             position:
@@ -221,17 +161,15 @@ const InterviewScreen = () => {
           };
         }
 
-        console.log('✅ Final candidate data set:', candidate);
         setCandidateData(candidate);
       } catch (err) {
-        console.error('❌ Error in fetchCandidateData:', err);
+        console.error('Error in fetchCandidateData:', err);
         setCandidateData(null);
       } finally {
         setLoadingCandidate(false);
       }
     };
 
-    // ✅ FETCH QUESTIONS
     const fetchQuestions = async (meeting) => {
       if (meeting?.assignedQuestions?.length > 0) {
         try {
@@ -252,7 +190,6 @@ const InterviewScreen = () => {
       }
     };
 
-    // ✅ DEFAULT QUESTION
     const loadDefaultQuestion = () => {
       setQuestions([
         {
@@ -281,10 +218,8 @@ const InterviewScreen = () => {
       ]);
     };
 
-    // ✅ MAIN FETCH MEETING DATA FUNCTION
     const fetchMeetingData = async () => {
       try {
-        console.log('📋 Fetching meeting data for:', meetingId);
         let meeting = null;
         let roomIdToUse = meetingId;
 
@@ -297,7 +232,6 @@ const InterviewScreen = () => {
             const meetings =
               response.data.data?.meetings || response.data.data || [];
             meeting = meetings.find((m) => m.roomId === roomIdToUse);
-            console.log('✅ Found meeting by roomId:', meeting?._id);
           } catch (err) {
             console.error('Error fetching meetings:', err);
           }
@@ -329,15 +263,11 @@ const InterviewScreen = () => {
 
         setActualRoomId(roomIdToUse);
         setMeetingData(meeting);
-        console.log('✅ Meeting data set:', meeting);
 
-        // ✅ Fetch candidate data if admin
         if (user?.role === 'admin') {
-          console.log('👤 User is admin, fetching candidate data...');
           await fetchCandidateData(meeting);
         }
 
-        // Fetch questions
         await fetchQuestions(meeting);
       } catch (error) {
         console.error('Error in fetchMeetingData:', error);
@@ -352,7 +282,7 @@ const InterviewScreen = () => {
   }, [meetingId, user]);
 
   // ============================================
-  // ✅ MEDIA STREAM MANAGEMENT
+  // MEDIA STREAM MANAGEMENT
   // ============================================
   const getMediaStream = useCallback(async (video, audio) => {
     if (!video && !audio) {
@@ -365,7 +295,6 @@ const InterviewScreen = () => {
     }
 
     try {
-      console.log('📹 Getting media stream:', { video, audio });
       const stream = await navigator.mediaDevices.getUserMedia({
         video: video
           ? {
@@ -393,7 +322,7 @@ const InterviewScreen = () => {
 
       return stream;
     } catch (err) {
-      console.error('❌ Media error:', err);
+      console.error('Media error:', err);
       setPermissionError(
         'Camera/mic access denied. Please enable permissions.'
       );
@@ -401,7 +330,6 @@ const InterviewScreen = () => {
     }
   }, []);
 
-  // Initialize media on mount
   useEffect(() => {
     if (camOn || micOn) {
       getMediaStream(camOn, micOn);
@@ -415,14 +343,10 @@ const InterviewScreen = () => {
   }, []);
 
   // ============================================
-  // ✅ WEBRTC PEER CONNECTION
+  // WEBRTC PEER CONNECTION
   // ============================================
   const createPeerConnection = useCallback(
     (targetSocketId, isInitiator = false) => {
-      console.log(
-        `🔌 Creating peer connection for ${targetSocketId}, initiator: ${isInitiator}`
-      );
-
       if (peerConnections.current[targetSocketId]) {
         peerConnections.current[targetSocketId].close();
         delete peerConnections.current[targetSocketId];
@@ -439,10 +363,6 @@ const InterviewScreen = () => {
       }
 
       pc.ontrack = (event) => {
-        console.log(
-          `📺 Track received from ${targetSocketId}:`,
-          event.track.kind
-        );
         const stream = event.streams[0];
         if (stream) {
           setRemoteStreams((prev) => ({ ...prev, [targetSocketId]: stream }));
@@ -465,9 +385,6 @@ const InterviewScreen = () => {
       };
 
       pc.onconnectionstatechange = () => {
-        console.log(
-          `🔗 Connection state ${targetSocketId}: ${pc.connectionState}`
-        );
         setConnectionStates((prev) => ({
           ...prev,
           [targetSocketId]: pc.connectionState,
@@ -507,7 +424,6 @@ const InterviewScreen = () => {
   const createAndSendOffer = useCallback(
     async (targetSocketId, pc) => {
       try {
-        console.log(`📤 Creating offer for ${targetSocketId}`);
         const offer = await pc.createOffer({
           offerToReceiveAudio: true,
           offerToReceiveVideo: true,
@@ -527,7 +443,6 @@ const InterviewScreen = () => {
 
   const handleOffer = useCallback(
     async ({ offer, from }) => {
-      console.log(`📥 Offer from ${from}`);
       let pc = peerConnections.current[from];
       if (!pc) {
         pc = createPeerConnection(from, false);
@@ -558,7 +473,6 @@ const InterviewScreen = () => {
   );
 
   const handleAnswer = useCallback(async ({ answer, from }) => {
-    console.log(`📥 Answer from ${from}`);
     const pc = peerConnections.current[from];
     if (pc && pc.signalingState !== 'stable') {
       try {
@@ -593,7 +507,6 @@ const InterviewScreen = () => {
   }, []);
 
   const cleanupPeerConnection = useCallback((socketId) => {
-    console.log(`🗑️ Cleaning up peer connection: ${socketId}`);
     const pc = peerConnections.current[socketId];
     if (pc) {
       pc.close();
@@ -633,14 +546,12 @@ const InterviewScreen = () => {
   }, []);
 
   // ============================================
-  // ✅ SOCKET CONNECTION
+  // SOCKET CONNECTION
   // ============================================
   useEffect(() => {
     if (!actualRoomId || !user?.id) {
       return;
     }
-
-    console.log('🔌 Initializing socket for room:', actualRoomId);
 
     const socket = io('http://localhost:5000', {
       transports: ['websocket', 'polling'],
@@ -655,7 +566,6 @@ const InterviewScreen = () => {
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      console.log('✅ Socket connected:', socket.id);
       setIsConnected(true);
       setIsReconnecting(false);
 
@@ -666,17 +576,14 @@ const InterviewScreen = () => {
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('❌ Socket disconnected:', reason);
       setIsConnected(false);
     });
 
     socket.on('reconnecting', (attemptNumber) => {
-      console.log('🔄 Reconnecting... attempt:', attemptNumber);
       setIsReconnecting(true);
     });
 
     socket.on('participantsUpdate', (list) => {
-      console.log('👥 Participants update:', list.length);
       setParticipants(
         list.map((p) => ({
           ...p,
@@ -686,7 +593,6 @@ const InterviewScreen = () => {
     });
 
     socket.on('existingParticipants', (existingUsers) => {
-      console.log('📢 Existing participants:', existingUsers.length);
       existingUsers.forEach((p) => {
         if (p.id !== user.id && !peerConnections.current[p.socketId]) {
           createPeerConnection(p.socketId, true);
@@ -695,16 +601,14 @@ const InterviewScreen = () => {
     });
 
     socket.on('newParticipant', (newUser) => {
-      console.log('👤 New participant:', newUser.name);
+      console.log('New participant:', newUser.name);
     });
 
     socket.on('sendOfferTo', ({ targetSocketId, targetUser }) => {
-      console.log('📤 Sending offer to:', targetUser?.name || targetSocketId);
       createPeerConnection(targetSocketId, true);
     });
 
     socket.on('participantLeft', ({ odlid }) => {
-      console.log('👋 Participant left:', odlid);
       cleanupPeerConnection(odlid);
       setParticipants((prev) => prev.filter((p) => p.socketId !== odlid));
     });
@@ -713,15 +617,9 @@ const InterviewScreen = () => {
     socket.on('answer', handleAnswer);
     socket.on('ice-candidate', handleIceCandidate);
 
-    socket.on('chatMessage', ({ message, from, timestamp }) => {
-      setChatMessages((prev) => [
-        ...prev,
-        { message, from, timestamp, isMe: from === user.name },
-      ]);
-    });
+    // REMOVED: chatMessage listener - now handled in ChatPanel
 
     return () => {
-      console.log('🧹 Cleaning up socket...');
       if (socket) {
         socket.emit('leaveInterview', {
           meetingId: actualRoomId,
@@ -743,7 +641,7 @@ const InterviewScreen = () => {
   ]);
 
   // ============================================
-  // ✅ EMIT READY WHEN STREAM IS AVAILABLE
+  // EMIT READY WHEN STREAM IS AVAILABLE
   // ============================================
   useEffect(() => {
     if (
@@ -751,13 +649,12 @@ const InterviewScreen = () => {
       socketRef.current?.connected &&
       actualRoomId
     ) {
-      console.log('📹 Stream ready, emitting readyToConnect');
       socketRef.current.emit('readyToConnect', { meetingId: actualRoomId });
     }
   }, [localStream, isConnected, actualRoomId]);
 
   // ============================================
-  // ✅ UPDATE VIDEO ELEMENT
+  // UPDATE VIDEO ELEMENT
   // ============================================
   useEffect(() => {
     if (videoRef.current && localStream) {
@@ -766,7 +663,7 @@ const InterviewScreen = () => {
   }, [localStream]);
 
   // ============================================
-  // ✅ TOGGLE CAMERA
+  // TOGGLE CAMERA
   // ============================================
   const toggleCamera = useCallback(async () => {
     const newState = !camOn;
@@ -791,7 +688,7 @@ const InterviewScreen = () => {
   }, [camOn, micOn, getMediaStream, updateStreamInConnections]);
 
   // ============================================
-  // ✅ TOGGLE MICROPHONE
+  // TOGGLE MICROPHONE
   // ============================================
   const toggleMic = useCallback(async () => {
     const newState = !micOn;
@@ -816,12 +713,10 @@ const InterviewScreen = () => {
   }, [camOn, micOn, getMediaStream, updateStreamInConnections]);
 
   // ============================================
-  // ✅ RECONNECT HANDLER
+  // RECONNECT HANDLER
   // ============================================
   const handleReconnect = useCallback(async () => {
-    console.log('🔄 Manual reconnect initiated');
     setIsReconnecting(true);
-
     cleanupAllConnections();
 
     if (socketRef.current) {
@@ -835,11 +730,9 @@ const InterviewScreen = () => {
   }, [cleanupAllConnections]);
 
   // ============================================
-  // ✅ LEAVE MEETING
+  // LEAVE MEETING
   // ============================================
   const handleLeave = useCallback(() => {
-    console.log('👋 Leaving meeting...');
-
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => track.stop());
     }
@@ -870,40 +763,20 @@ const InterviewScreen = () => {
     cleanupAllConnections,
   ]);
 
-  // ============================================
-  // ✅ SEND CHAT MESSAGE
-  // ============================================
-  const handleSendMessage = useCallback(
-    (message) => {
-      if (socketRef.current && message.trim() && actualRoomId) {
-        const timestamp = new Date().toISOString();
-        socketRef.current.emit('chatMessage', {
-          meetingId: actualRoomId,
-          message,
-          from: user.name,
-          timestamp,
-        });
-        setChatMessages((prev) => [
-          ...prev,
-          { message, from: user.name, timestamp, isMe: true },
-        ]);
-      }
-    },
-    [actualRoomId, user]
-  );
+  // REMOVED: handleSendMessage - now handled in ChatPanel
 
   // ============================================
-  // ✅ HELPER FUNCTIONS
+  // HELPER FUNCTIONS
   // ============================================
   const currentQuestion =
     questions.length > 0 ? questions[currentQuestionIndex] : null;
 
   // ============================================
-  // ✅ RENDER - USING COMPONENTS
+  // RENDER
   // ============================================
   return (
     <div className="h-screen bg-gray-200 font-sans flex flex-col overflow-hidden">
-      {/* ✅ HEADER */}
+      {/* HEADER */}
       <InterviewHeader
         meetingData={meetingData}
         candidateData={candidateData}
@@ -913,11 +786,11 @@ const InterviewScreen = () => {
         isReconnecting={isReconnecting}
       />
 
-      {/* ✅ MAIN CONTENT */}
+      {/* MAIN CONTENT */}
       <div className="flex-1 flex overflow-hidden">
         <div className="flex flex-col flex-1">
           <div className="flex-1 flex overflow-hidden">
-            {/* ✅ VIDEO SECTION */}
+            {/* VIDEO SECTION */}
             <VideoSection
               videoRef={videoRef}
               user={user}
@@ -936,7 +809,7 @@ const InterviewScreen = () => {
               }
             />
 
-            {/* ✅ TOOLS BAR */}
+            {/* TOOLS BAR */}
             <ToolsBar
               activePanel={activePanel}
               setActivePanel={setActivePanel}
@@ -946,7 +819,7 @@ const InterviewScreen = () => {
             />
           </div>
 
-          {/* ✅ BOTTOM CONTROLS */}
+          {/* BOTTOM CONTROLS */}
           <BottomControls
             micOn={micOn}
             camOn={camOn}
@@ -964,7 +837,7 @@ const InterviewScreen = () => {
           />
         </div>
 
-        {/* ✅ RIGHT PANEL */}
+        {/* RIGHT PANEL - UPDATED PROPS */}
         <RightPanel
           activePanel={activePanel}
           setActivePanel={setActivePanel}
@@ -976,11 +849,10 @@ const InterviewScreen = () => {
           questions={questions}
           currentQuestionIndex={currentQuestionIndex}
           setCurrentQuestionIndex={setCurrentQuestionIndex}
-          chatMessages={chatMessages}
-          handleSendMessage={handleSendMessage}
-          user={user}
-          actualRoomId={actualRoomId}
+          // UPDATED: New chat props
+          meetingId={actualRoomId}
           socket={socketRef.current}
+          user={user}
           candidateData={candidateData}
           loadingCandidate={loadingCandidate}
         />

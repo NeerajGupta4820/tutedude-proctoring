@@ -1,5 +1,5 @@
 // controllers/candidateController.js
-import Candidate from '../models/Candidate.js';
+import Candidate from '../models/CandidateSchema.js';
 import { ApiError } from '../middleware/errorHandler.js';
 import {
   uploadToCloudinary,

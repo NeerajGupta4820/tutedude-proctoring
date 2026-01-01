@@ -1,7 +1,7 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse, PaginatedResponse } from '../utils/response.js';
 import meetingService from '../services/meeting.service.js';
-import User from '../models/User.js';
+import User from '../models/UserSchema.js';
 
 export const createMeeting = asyncHandler(async (req, res) => {
   const meeting = await meetingService.createMeeting(req.body, req.user.id);

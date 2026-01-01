@@ -1,4 +1,4 @@
-import User from '../models/User.js';
+import User from '../models/UserSchema.js';
 import { ApiError } from '../middleware/errorHandler.js';
 
 // Get all interviewers

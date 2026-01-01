@@ -1,10 +1,11 @@
-import Meeting from '../models/Meeting.js';
-import Candidate from '../models/Candidate.js';
-import User from '../models/User.js';
-import Question from '../models/Question.js';
+import Meeting from '../models/MeetingSchema.js';
+import Candidate from '../models/CandidateSchema.js';
+import User from '../models/UserSchema.js';
+import Question from '../models/QuestionSchema.js';
 import { ApiError } from '../utils/response.js';
 import { MEETING_STATUS } from '../constants/meeting.constants.js';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 
 class MeetingService {
   generateRoomId() {
@@ -93,16 +94,35 @@ class MeetingService {
     return this.getMeetingById(meeting._id);
   }
 
+  // ✅ UPDATED: Now handles both ObjectId and roomId
   async getMeetingById(meetingId) {
-    const meeting = await Meeting.findById(meetingId)
-      .populate('candidate', 'name email phone position')
-      .populate('interviewer', 'name email role avatar')
-      .populate({
-        path: 'assignedQuestions.question',
-        select:
-          'title description questionType category difficulty format points timeLimit codingDetails',
-      })
-      .lean();
+    let meeting;
+
+    // Check if it's a valid ObjectId
+    if (mongoose.Types.ObjectId.isValid(meetingId)) {
+      meeting = await Meeting.findById(meetingId)
+        .populate('candidate', 'name email phone position')
+        .populate('interviewer', 'name email role avatar')
+        .populate({
+          path: 'assignedQuestions.question',
+          select:
+            'title description questionType category difficulty format points timeLimit codingDetails',
+        })
+        .lean();
+    }
+
+    // If not found by _id, try finding by roomId
+    if (!meeting) {
+      meeting = await Meeting.findOne({ roomId: meetingId })
+        .populate('candidate', 'name email phone position')
+        .populate('interviewer', 'name email role avatar')
+        .populate({
+          path: 'assignedQuestions.question',
+          select:
+            'title description questionType category difficulty format points timeLimit codingDetails',
+        })
+        .lean();
+    }
 
     if (!meeting) {
       throw new ApiError(404, 'Meeting not found');
@@ -148,13 +168,33 @@ class MeetingService {
     };
   }
 
+  // ✅ UPDATED: Now handles both ObjectId and roomId
   async updateMeeting(meetingId, updateData) {
-    const meeting = await Meeting.findByIdAndUpdate(meetingId, updateData, {
-      new: true,
-      runValidators: true,
-    })
-      .populate('candidate', 'name email')
-      .populate('assignedQuestions.question');
+    let meeting;
+
+    // Check if it's a valid ObjectId
+    if (mongoose.Types.ObjectId.isValid(meetingId)) {
+      meeting = await Meeting.findByIdAndUpdate(meetingId, updateData, {
+        new: true,
+        runValidators: true,
+      })
+        .populate('candidate', 'name email')
+        .populate('assignedQuestions.question');
+    }
+
+    // If not found by _id, try finding and updating by roomId
+    if (!meeting) {
+      meeting = await Meeting.findOneAndUpdate(
+        { roomId: meetingId },
+        updateData,
+        {
+          new: true,
+          runValidators: true,
+        }
+      )
+        .populate('candidate', 'name email')
+        .populate('assignedQuestions.question');
+    }
 
     if (!meeting) {
       throw new ApiError(404, 'Meeting not found');

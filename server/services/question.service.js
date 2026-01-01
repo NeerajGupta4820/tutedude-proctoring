@@ -1,4 +1,4 @@
-import Question from '../models/Question.js';
+import Question from '../models/QuestionSchema.js';
 import { ApiError } from '../utils/response.js';
 
 class QuestionService {

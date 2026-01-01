@@ -65,7 +65,7 @@ const meetingSchema = new mongoose.Schema(
         languages: [{ type: String, default: 'javascript' }],
       },
       whiteboard: {
-        enabled: { type: Boolean, default: false },
+        enabled: { type: Boolean, default: true },
       },
       screenShare: {
         enabled: { type: Boolean, default: false },
@@ -76,6 +76,10 @@ const meetingSchema = new mongoose.Schema(
       chat: {
         enabled: { type: Boolean, default: true },
       },
+    },
+    chatStats: {
+      totalMessages: { type: Number, default: 0 },
+      lastMessageAt: Date,
     },
 
     // Questions

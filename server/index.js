@@ -7,12 +7,13 @@ import http from 'http';
 import { Server as SocketIO } from 'socket.io';
 import setupSocketHandlers from './config/socketHandler.js';
 import authRoutes from './routes/auth.js';
-import candidateRoutes from './routes/candidate.js';
-import interviewerRoutes from './routes/interviewer.js';
-import logRoutes from './routes/log.js';
-import reportRoutes from './routes/report.js';
-import meetingRoutes from './routes/meeting.js';
-import questionRoutes from './routes/question.js';
+import candidateRoutes from './routes/candidateRoutes.js';
+import interviewerRoutes from './routes/interviewerRoutes.js';
+import logRoutes from './routes/logRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
+import meetingRoutes from './routes/meetingRoutes.js';
+import questionRoutes from './routes/questionRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
 import connectDB from './db/dbconfig.js';
 
 dotenv.config();
@@ -41,6 +42,7 @@ app.use('/api/interviewer', interviewerRoutes);
 app.use('/api/meeting', meetingRoutes);
 app.use('/api/question', questionRoutes);
 app.use('/api/log', logRoutes);
+app.use('/api/chats', chatRoutes);
 app.use('/api/report', reportRoutes);
 
 // Error handler
