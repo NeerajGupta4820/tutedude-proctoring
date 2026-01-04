@@ -13,6 +13,8 @@ import logRoutes from './routes/logRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import meetingRoutes from './routes/meetingRoutes.js';
 import questionRoutes from './routes/questionRoutes.js';
+import codeRoutes from './routes/codeRoutes.js';
+import interviewResultRoutes from './routes/interviewResultRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import connectDB from './db/dbconfig.js';
 
@@ -44,6 +46,8 @@ app.use('/api/question', questionRoutes);
 app.use('/api/log', logRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/report', reportRoutes);
+app.use('/api/code', codeRoutes);
+app.use('/api/interview-results', interviewResultRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {
