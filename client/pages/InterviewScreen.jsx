@@ -45,6 +45,9 @@ const InterviewScreen = () => {
   const [activePanel, setActivePanel] = useState(null);
   const [timer, setTimer] = useState('00:00');
 
+  // Whiteboard Fullscreen State (synced via socket)
+  const [whiteboardFullscreen, setWhiteboardFullscreen] = useState(false);
+
   // Media States
   const [camOn, setCamOn] = useState(
     navState.cameraOn !== undefined ? navState.cameraOn : false
@@ -73,8 +76,6 @@ const InterviewScreen = () => {
   const [participants, setParticipants] = useState([]);
   const [remoteStreams, setRemoteStreams] = useState({});
   const [connectionStates, setConnectionStates] = useState({});
-
-  // REMOVED: chatMessages state - now handled in ChatPanel
 
   // Refs
   const videoRef = useRef(null);
@@ -566,6 +567,7 @@ const InterviewScreen = () => {
     socketRef.current = socket;
 
     socket.on('connect', () => {
+      console.log('✅ Socket connected:', socket.id);
       setIsConnected(true);
       setIsReconnecting(false);
 
@@ -573,13 +575,18 @@ const InterviewScreen = () => {
         meetingId: actualRoomId,
         user: { id: user.id, name: user.name, role: user.role },
       });
+
+      // Request current whiteboard settings on connect
+      socket.emit('whiteboard-get-settings', { meetingId: actualRoomId });
     });
 
     socket.on('disconnect', (reason) => {
+      console.log('❌ Socket disconnected:', reason);
       setIsConnected(false);
     });
 
     socket.on('reconnecting', (attemptNumber) => {
+      console.log('🔄 Reconnecting...', attemptNumber);
       setIsReconnecting(true);
     });
 
@@ -617,7 +624,22 @@ const InterviewScreen = () => {
     socket.on('answer', handleAnswer);
     socket.on('ice-candidate', handleIceCandidate);
 
-    // REMOVED: chatMessage listener - now handled in ChatPanel
+    // Listen for whiteboard fullscreen events
+    socket.on('whiteboard-fullscreen', ({ isFullscreen }) => {
+      console.log('🖥️ Whiteboard fullscreen received:', isFullscreen);
+      setWhiteboardFullscreen(isFullscreen);
+    });
+
+    // Listen for whiteboard settings (on initial load)
+    socket.on('whiteboard-settings', ({ isFullscreen, isLocked }) => {
+      console.log('📋 Whiteboard settings received:', {
+        isFullscreen,
+        isLocked,
+      });
+      if (isFullscreen !== undefined) {
+        setWhiteboardFullscreen(isFullscreen);
+      }
+    });
 
     return () => {
       if (socket) {
@@ -763,8 +785,6 @@ const InterviewScreen = () => {
     cleanupAllConnections,
   ]);
 
-  // REMOVED: handleSendMessage - now handled in ChatPanel
-
   // ============================================
   // HELPER FUNCTIONS
   // ============================================
@@ -837,7 +857,7 @@ const InterviewScreen = () => {
           />
         </div>
 
-        {/* RIGHT PANEL - UPDATED PROPS */}
+        {/* RIGHT PANEL */}
         <RightPanel
           activePanel={activePanel}
           setActivePanel={setActivePanel}
@@ -849,12 +869,14 @@ const InterviewScreen = () => {
           questions={questions}
           currentQuestionIndex={currentQuestionIndex}
           setCurrentQuestionIndex={setCurrentQuestionIndex}
-          // UPDATED: New chat props
           meetingId={actualRoomId}
           socket={socketRef.current}
           user={user}
+          participants={participants}
           candidateData={candidateData}
           loadingCandidate={loadingCandidate}
+          whiteboardFullscreen={whiteboardFullscreen}
+          setWhiteboardFullscreen={setWhiteboardFullscreen}
         />
       </div>
     </div>

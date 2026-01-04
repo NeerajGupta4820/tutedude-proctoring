@@ -38,6 +38,8 @@ const WhiteboardPanel = ({
   socket,
   isInterviewer = false,
   userName = 'User',
+  isFullscreen = false,
+  onFullscreenChange,
 }) => {
   // ========================================
   // REFS
@@ -58,7 +60,6 @@ const WhiteboardPanel = ({
   const [fillColor, setFillColor] = useState('transparent');
   const [lineWidth, setLineWidth] = useState(3);
   const [tool, setTool] = useState('pen');
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
 
   // ========================================
@@ -139,6 +140,39 @@ const WhiteboardPanel = ({
     setIsLocked,
     setStickyNotes,
   });
+
+  // ========================================
+  // EMIT FULLSCREEN CHANGE (Admin only)
+  // ========================================
+  const emitFullscreenChange = useCallback(
+    (newFullscreen) => {
+      if (socket && meetingId && isInterviewer) {
+        console.log('🖥️ Emitting whiteboard fullscreen:', newFullscreen);
+        socket.emit('whiteboard-fullscreen', {
+          meetingId,
+          isFullscreen: newFullscreen,
+        });
+      }
+    },
+    [socket, meetingId, isInterviewer]
+  );
+
+  // ========================================
+  // TOGGLE FULLSCREEN (Admin only)
+  // ========================================
+  const toggleFullscreen = useCallback(() => {
+    if (!isInterviewer) return; // Only admin can toggle fullscreen
+
+    const newFullscreen = !isFullscreen;
+
+    // Update local state via parent
+    if (onFullscreenChange) {
+      onFullscreenChange(newFullscreen);
+    }
+
+    // Emit to other users (including candidate)
+    emitFullscreenChange(newFullscreen);
+  }, [isInterviewer, isFullscreen, onFullscreenChange, emitFullscreenChange]);
 
   // ========================================
   // COMMIT TEXT HELPER
@@ -238,6 +272,10 @@ const WhiteboardPanel = ({
     if (canvas && container && tempCanvas) {
       const updateCanvasSize = () => {
         const rect = container.getBoundingClientRect();
+
+        // Store current canvas data before resizing
+        const currentData = canvas.toDataURL();
+
         canvas.width = rect.width;
         canvas.height = rect.height;
         tempCanvas.width = rect.width;
@@ -249,14 +287,26 @@ const WhiteboardPanel = ({
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        if (!loadFromHistory() && history.length === 0) {
+        // Restore canvas data after resize
+        if (currentData && history.length > 0) {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0);
+          };
+          img.src = currentData;
+        } else if (!loadFromHistory() && history.length === 0) {
           initializeHistory(canvas.toDataURL());
         }
       };
 
-      updateCanvasSize();
+      // Small delay to allow fullscreen animation to complete
+      const timeoutId = setTimeout(updateCanvasSize, 100);
+
       window.addEventListener('resize', updateCanvasSize);
-      return () => window.removeEventListener('resize', updateCanvasSize);
+      return () => {
+        clearTimeout(timeoutId);
+        window.removeEventListener('resize', updateCanvasSize);
+      };
     }
   }, [isFullscreen, loadFromHistory, initializeHistory, history.length]);
 
@@ -644,7 +694,7 @@ const WhiteboardPanel = ({
   // ========================================
   return (
     <div className={containerClasses}>
-      {/* ==================== HEADER ==================== */}
+      {/* HEADER */}
       <Header
         activeUsers={activeUsers}
         isLocked={isLocked}
@@ -659,11 +709,11 @@ const WhiteboardPanel = ({
         onToggleGrid={() => setShowGrid(!showGrid)}
         onToggleCursors={() => setShowCursors(!showCursors)}
         onToggleLock={toggleLock}
-        onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+        onToggleFullscreen={toggleFullscreen}
         onClose={onClose}
       />
 
-      {/* ==================== TOOLBAR ==================== */}
+      {/* TOOLBAR */}
       <Toolbar
         tool={tool}
         color={color}
@@ -688,7 +738,7 @@ const WhiteboardPanel = ({
         onToggleNotes={() => setShowNotes(!showNotes)}
       />
 
-      {/* ==================== CANVAS CONTAINER ==================== */}
+      {/* CANVAS CONTAINER */}
       <div className="flex-1 flex overflow-hidden relative">
         <div
           ref={containerRef}
@@ -782,7 +832,7 @@ const WhiteboardPanel = ({
         )}
       </div>
 
-      {/* ==================== COLOR PICKER (STROKE) ==================== */}
+      {/* COLOR PICKER (STROKE) */}
       {showColorPicker && (
         <ColorPicker
           pickerRef={colorPickerRef}
@@ -795,7 +845,7 @@ const WhiteboardPanel = ({
         />
       )}
 
-      {/* ==================== COLOR PICKER (FILL) ==================== */}
+      {/* COLOR PICKER (FILL) */}
       {showFillPicker && (
         <ColorPicker
           pickerRef={fillPickerRef}
@@ -808,7 +858,7 @@ const WhiteboardPanel = ({
         />
       )}
 
-      {/* ==================== CODE SNIPPET MODAL ==================== */}
+      {/* CODE SNIPPET MODAL */}
       {showCodeSnippet && (
         <CodeSnippetModal
           value={codeSnippet}

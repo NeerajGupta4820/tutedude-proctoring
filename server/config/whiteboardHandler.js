@@ -295,6 +295,7 @@ export const setupWhiteboardHandlers = (io, socket) => {
         historyIndex: state.historyIndex,
         savedAt: state.savedAt,
         isLocked: settings?.isLocked || false,
+        isFullscreen: settings?.isFullscreen || false,
       });
     } else {
       socket.emit('whiteboard-load-state', {
@@ -302,6 +303,7 @@ export const setupWhiteboardHandlers = (io, socket) => {
         history: [],
         historyIndex: -1,
         isLocked: settings?.isLocked || false,
+        isFullscreen: settings?.isFullscreen || false,
       });
     }
   });
@@ -343,6 +345,56 @@ export const setupWhiteboardHandlers = (io, socket) => {
       size: size,
       socketId: socket.id,
       userName: user?.name || 'Unknown',
+    });
+  });
+
+  // 1️⃣9️⃣ Whiteboard Fullscreen Toggle (Admin controls for everyone)
+  socket.on('whiteboard-fullscreen', (data) => {
+    const { meetingId, isFullscreen } = data;
+    const user = socket.userData;
+
+    if (!meetingId) {
+      console.error('❌ whiteboard-fullscreen: Missing meetingId');
+      return;
+    }
+
+    // Only admin can toggle fullscreen
+    if (user?.role !== 'admin') {
+      console.log(`❌ Non-admin (${user?.role}) tried to toggle fullscreen`);
+      return;
+    }
+
+    console.log(
+      `🖥️ Whiteboard fullscreen ${isFullscreen ? 'ON' : 'OFF'} in room ${meetingId} by ${user?.name}`
+    );
+
+    // Store the fullscreen setting
+    if (!whiteboardSettings[meetingId]) {
+      whiteboardSettings[meetingId] = {};
+    }
+    whiteboardSettings[meetingId].isFullscreen = isFullscreen;
+
+    // Broadcast to ALL users in room (including sender for confirmation)
+    io.to(meetingId).emit('whiteboard-fullscreen', {
+      isFullscreen: isFullscreen,
+      socketId: socket.id,
+      userName: user?.name || 'Admin',
+    });
+  });
+
+  // 2️⃣0️⃣ Request current whiteboard settings (for new joiners)
+  socket.on('whiteboard-get-settings', (data) => {
+    const { meetingId } = data;
+
+    if (!meetingId) return;
+
+    const settings = whiteboardSettings[meetingId] || {};
+
+    console.log(`📋 Sending whiteboard settings to ${socket.id}:`, settings);
+
+    socket.emit('whiteboard-settings', {
+      isFullscreen: settings.isFullscreen || false,
+      isLocked: settings.isLocked || false,
     });
   });
 

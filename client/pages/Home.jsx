@@ -12,11 +12,12 @@ import {
   FaCheckCircle,
   FaExclamationTriangle,
   FaSpinner,
+  FaSignOutAlt, // ← Logout icon add kiya
 } from 'react-icons/fa';
 
 const Home = () => {
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
+  const { user, logout } = useContext(AuthContext); // ← logout add kiya
   const [meeting, setMeeting] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -45,6 +46,12 @@ const Home = () => {
     };
     fetchMeeting();
   }, [user]);
+
+  // ← Logout handler function
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   const handleNext = async (e) => {
     e.preventDefault();
@@ -155,11 +162,24 @@ const Home = () => {
             </div>
             <span className="hidden sm:inline">Interview Proctor</span>
           </Link>
-          <div className="flex items-center gap-2 text-white">
-            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-            <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-lg">
-              Welcome, {user?.name || 'User'}
-            </span>
+
+          {/* ← Right side - User info and Logout button */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 text-white">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-sm font-medium bg-white/20 px-3 py-1 rounded-lg">
+                Welcome, {user?.name || 'User'}
+              </span>
+            </div>
+
+            {/* ← Logout Button */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg"
+            >
+              <FaSignOutAlt />
+              <span className="hidden sm:inline">Logout</span>
+            </button>
           </div>
         </div>
       </header>

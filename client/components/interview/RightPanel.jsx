@@ -21,16 +21,33 @@ const RightPanel = ({
   meetingId,
   socket,
   user,
-  participants, // Add this prop
+  participants,
   candidateData,
   loadingCandidate,
+  whiteboardFullscreen = false,
+  setWhiteboardFullscreen,
 }) => {
+  // If whiteboard is fullscreen, render it separately
+  if (activePanel === 'whiteboard' && whiteboardFullscreen) {
+    return (
+      <WhiteboardPanel
+        onClose={() => setActivePanel(null)}
+        meetingId={meetingId}
+        socket={socket}
+        isInterviewer={user?.role === 'admin'}
+        userName={user?.name || 'User'}
+        isFullscreen={whiteboardFullscreen}
+        onFullscreenChange={setWhiteboardFullscreen}
+      />
+    );
+  }
+
   if (!activePanel) return null;
 
   const isAdmin = user?.role === 'admin';
 
   return (
-    <div className="w-[480px] h-full border-l border-gray-300 bg-white flex-shrink-0">
+    <div className="w-[480px] h-full border-l border-gray-300 bg-white flex-shrink-0 transition-all duration-300 ease-in-out">
       {activePanel === 'code' && (
         <CodeEditor
           question={currentQuestion}
@@ -57,16 +74,20 @@ const RightPanel = ({
           meetingId={meetingId}
           socket={socket}
           currentUser={user}
-          participants={participants} // Pass participants here
+          participants={participants}
           onClose={() => setActivePanel(null)}
         />
       )}
 
-      {activePanel === 'whiteboard' && (
+      {activePanel === 'whiteboard' && !whiteboardFullscreen && (
         <WhiteboardPanel
           onClose={() => setActivePanel(null)}
           meetingId={meetingId}
           socket={socket}
+          isInterviewer={isAdmin}
+          userName={user?.name || 'User'}
+          isFullscreen={whiteboardFullscreen}
+          onFullscreenChange={setWhiteboardFullscreen}
         />
       )}
 

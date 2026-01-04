@@ -1,3 +1,4 @@
+// hooks/useSocketEvents.js
 import { useEffect, useCallback } from 'react';
 import {
   drawLine,
@@ -14,12 +15,15 @@ export const useSocketEvents = ({
   setRemoteCursors,
   setIsLocked,
   setStickyNotes,
+  setPanelSize, // Optional - for syncing panel size
 }) => {
   useEffect(() => {
     if (!socket || !meetingId) return;
 
+    // Request current state when connecting
     socket.emit('whiteboard-request-state', { meetingId });
 
+    // Handle Draw
     const handleDraw = (data) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -34,6 +38,7 @@ export const useSocketEvents = ({
       );
     };
 
+    // Handle Shape
     const handleShape = (data) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -49,6 +54,7 @@ export const useSocketEvents = ({
       );
     };
 
+    // Handle Text
     const handleText = (data) => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -63,23 +69,27 @@ export const useSocketEvents = ({
       );
     };
 
+    // Handle Clear
     const handleClear = () => {
       clearCanvasWithWhite(canvasRef.current);
       setStickyNotes([]);
     };
 
+    // Handle Undo
     const handleUndoRemote = (data) => {
       if (data.canvasData) {
         loadCanvasFromData(canvasRef.current, data.canvasData);
       }
     };
 
+    // Handle Redo
     const handleRedoRemote = (data) => {
       if (data.canvasData) {
         loadCanvasFromData(canvasRef.current, data.canvasData);
       }
     };
 
+    // Handle Cursor
     const handleCursor = (data) => {
       setRemoteCursors((prev) => ({
         ...prev,
@@ -92,6 +102,7 @@ export const useSocketEvents = ({
       }));
     };
 
+    // Handle Cursor Leave
     const handleCursorLeave = ({ socketId }) => {
       setRemoteCursors((prev) => {
         const newCursors = { ...prev };
@@ -100,10 +111,12 @@ export const useSocketEvents = ({
       });
     };
 
+    // Handle Lock
     const handleLock = (data) => {
       setIsLocked(data.locked);
     };
 
+    // Handle Sticky Notes
     const handleSticky = (data) => {
       if (data.action === 'add') {
         setStickyNotes((prev) => [...prev, data.note]);
@@ -116,7 +129,19 @@ export const useSocketEvents = ({
       }
     };
 
-    const handleLoadState = ({ canvasData }) => {
+    // Handle Load State (includes panel size)
+    const handleLoadState = ({ canvasData, panelSize, isLocked }) => {
+      if (canvasData) {
+        loadCanvasFromData(canvasRef.current, canvasData);
+      }
+      if (isLocked !== undefined) {
+        setIsLocked(isLocked);
+      }
+      // Panel size is handled in InterviewScreen.jsx
+    };
+
+    // Handle Full Sync
+    const handleFullSync = ({ canvasData }) => {
       if (canvasData) {
         loadCanvasFromData(canvasRef.current, canvasData);
       }
@@ -134,6 +159,7 @@ export const useSocketEvents = ({
     socket.on('whiteboard-lock', handleLock);
     socket.on('whiteboard-sticky', handleSticky);
     socket.on('whiteboard-load-state', handleLoadState);
+    socket.on('whiteboard-full-sync', handleFullSync);
 
     // Cleanup
     return () => {
@@ -148,6 +174,7 @@ export const useSocketEvents = ({
       socket.off('whiteboard-lock', handleLock);
       socket.off('whiteboard-sticky', handleSticky);
       socket.off('whiteboard-load-state', handleLoadState);
+      socket.off('whiteboard-full-sync', handleFullSync);
     };
   }, [
     socket,
@@ -158,7 +185,7 @@ export const useSocketEvents = ({
     setStickyNotes,
   ]);
 
-  // Emit functions
+  // Emit Draw
   const emitDraw = useCallback(
     (data) => {
       if (socket && meetingId) {
@@ -168,6 +195,7 @@ export const useSocketEvents = ({
     [socket, meetingId]
   );
 
+  // Emit Shape
   const emitShape = useCallback(
     (data) => {
       if (socket && meetingId) {
@@ -177,6 +205,7 @@ export const useSocketEvents = ({
     [socket, meetingId]
   );
 
+  // Emit Text
   const emitText = useCallback(
     (data) => {
       if (socket && meetingId) {
@@ -186,12 +215,14 @@ export const useSocketEvents = ({
     [socket, meetingId]
   );
 
+  // Emit Clear
   const emitClear = useCallback(() => {
     if (socket && meetingId) {
       socket.emit('whiteboard-clear', { meetingId });
     }
   }, [socket, meetingId]);
 
+  // Emit Cursor
   const emitCursor = useCallback(
     (data) => {
       if (socket && meetingId) {
@@ -201,6 +232,7 @@ export const useSocketEvents = ({
     [socket, meetingId]
   );
 
+  // Emit Lock
   const emitLock = useCallback(
     (locked) => {
       if (socket && meetingId) {
@@ -210,10 +242,21 @@ export const useSocketEvents = ({
     [socket, meetingId]
   );
 
+  // Emit Sticky
   const emitSticky = useCallback(
     (data) => {
       if (socket && meetingId) {
         socket.emit('whiteboard-sticky', { meetingId, ...data });
+      }
+    },
+    [socket, meetingId]
+  );
+
+  // Emit Panel Resize
+  const emitPanelResize = useCallback(
+    (size) => {
+      if (socket && meetingId) {
+        socket.emit('whiteboard-resize', { meetingId, size });
       }
     },
     [socket, meetingId]
@@ -227,5 +270,8 @@ export const useSocketEvents = ({
     emitCursor,
     emitLock,
     emitSticky,
+    emitPanelResize,
   };
 };
+
+export default useSocketEvents;
