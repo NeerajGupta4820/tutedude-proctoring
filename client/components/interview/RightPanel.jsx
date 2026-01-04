@@ -24,9 +24,17 @@ const RightPanel = ({
   participants,
   candidateData,
   loadingCandidate,
+  // Whiteboard props
   whiteboardFullscreen = false,
   setWhiteboardFullscreen,
+  // Question props
+  questionFullscreen = false,
+  setQuestionFullscreen,
+  questionVisibleToCandidate = false,
+  setQuestionVisibleToCandidate,
 }) => {
+  const isAdmin = user?.role === 'admin';
+
   // If whiteboard is fullscreen, render it separately
   if (activePanel === 'whiteboard' && whiteboardFullscreen) {
     return (
@@ -34,7 +42,7 @@ const RightPanel = ({
         onClose={() => setActivePanel(null)}
         meetingId={meetingId}
         socket={socket}
-        isInterviewer={user?.role === 'admin'}
+        isInterviewer={isAdmin}
         userName={user?.name || 'User'}
         isFullscreen={whiteboardFullscreen}
         onFullscreenChange={setWhiteboardFullscreen}
@@ -42,9 +50,26 @@ const RightPanel = ({
     );
   }
 
-  if (!activePanel) return null;
+  // If question is fullscreen, render it separately
+  if (activePanel === 'question' && questionFullscreen) {
+    return (
+      <QuestionPanel
+        questions={questions}
+        currentQuestionIndex={currentQuestionIndex}
+        setCurrentQuestionIndex={setCurrentQuestionIndex}
+        onClose={() => setActivePanel(null)}
+        isInterviewer={isAdmin}
+        isFullscreen={questionFullscreen}
+        onFullscreenChange={setQuestionFullscreen}
+        isVisibleToCandidate={questionVisibleToCandidate}
+        onVisibilityChange={setQuestionVisibleToCandidate}
+        socket={socket}
+        meetingId={meetingId}
+      />
+    );
+  }
 
-  const isAdmin = user?.role === 'admin';
+  if (!activePanel) return null;
 
   return (
     <div className="w-[480px] h-full border-l border-gray-300 bg-white flex-shrink-0 transition-all duration-300 ease-in-out">
@@ -60,12 +85,19 @@ const RightPanel = ({
         />
       )}
 
-      {activePanel === 'question' && (
+      {activePanel === 'question' && !questionFullscreen && (
         <QuestionPanel
           questions={questions}
           currentQuestionIndex={currentQuestionIndex}
           setCurrentQuestionIndex={setCurrentQuestionIndex}
           onClose={() => setActivePanel(null)}
+          isInterviewer={isAdmin}
+          isFullscreen={questionFullscreen}
+          onFullscreenChange={setQuestionFullscreen}
+          isVisibleToCandidate={questionVisibleToCandidate}
+          onVisibilityChange={setQuestionVisibleToCandidate}
+          socket={socket}
+          meetingId={meetingId}
         />
       )}
 

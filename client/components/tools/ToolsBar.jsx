@@ -1,3 +1,4 @@
+// components/tools/ToolsBar.jsx
 import React from 'react';
 import {
   FaCode,
@@ -8,7 +9,16 @@ import {
   FaFileAlt,
 } from 'react-icons/fa';
 
-const ToolsBar = ({ activePanel, setActivePanel, meetingData, user }) => {
+const ToolsBar = ({
+  activePanel,
+  setActivePanel,
+  meetingData,
+  user,
+  questionVisibleToCandidate = false,
+}) => {
+  const isAdmin = user?.role === 'admin';
+  const isCandidate = user?.role === 'candidate';
+
   const allTools = [
     {
       id: 'chat',
@@ -18,6 +28,7 @@ const ToolsBar = ({ activePanel, setActivePanel, meetingData, user }) => {
       color: 'from-purple-500 to-purple-600',
       hoverColor: 'hover:from-purple-600 hover:to-purple-700',
       adminOnly: false,
+      candidateVisible: true, // Always visible to candidate
     },
     {
       id: 'whiteboard',
@@ -27,6 +38,7 @@ const ToolsBar = ({ activePanel, setActivePanel, meetingData, user }) => {
       color: 'from-orange-500 to-orange-600',
       hoverColor: 'hover:from-orange-600 hover:to-orange-700',
       adminOnly: false,
+      candidateVisible: true, // Always visible to candidate
     },
     {
       id: 'question',
@@ -35,7 +47,8 @@ const ToolsBar = ({ activePanel, setActivePanel, meetingData, user }) => {
       enabled: true,
       color: 'from-green-500 to-green-600',
       hoverColor: 'hover:from-green-600 hover:to-green-700',
-      adminOnly: true,
+      adminOnly: false, // Changed to false - now controlled by visibility
+      candidateVisible: questionVisibleToCandidate, // Controlled by admin
     },
     {
       id: 'code',
@@ -45,6 +58,7 @@ const ToolsBar = ({ activePanel, setActivePanel, meetingData, user }) => {
       color: 'from-blue-500 to-blue-600',
       hoverColor: 'hover:from-blue-600 hover:to-blue-700',
       adminOnly: true,
+      candidateVisible: false,
     },
     {
       id: 'profile',
@@ -54,6 +68,7 @@ const ToolsBar = ({ activePanel, setActivePanel, meetingData, user }) => {
       color: 'from-pink-500 to-pink-600',
       hoverColor: 'hover:from-pink-600 hover:to-pink-700',
       adminOnly: true,
+      candidateVisible: false,
     },
     {
       id: 'resume',
@@ -63,14 +78,28 @@ const ToolsBar = ({ activePanel, setActivePanel, meetingData, user }) => {
       color: 'from-indigo-500 to-indigo-600',
       hoverColor: 'hover:from-indigo-600 hover:to-indigo-700',
       adminOnly: false,
+      candidateVisible: true,
     },
   ];
 
-  // Filter tools based on user role
+  // Filter tools based on user role and visibility settings
   const tools = allTools.filter((tool) => {
     if (!tool.enabled) return false;
-    if (tool.adminOnly && user?.role !== 'admin') return false;
-    return true;
+
+    // Admin can see all tools
+    if (isAdmin) return true;
+
+    // For candidates
+    if (isCandidate) {
+      // Admin-only tools are hidden
+      if (tool.adminOnly) return false;
+
+      // Check if tool is visible to candidate
+      return tool.candidateVisible;
+    }
+
+    // Default: show if not admin-only
+    return !tool.adminOnly;
   });
 
   return (

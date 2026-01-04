@@ -45,8 +45,13 @@ const InterviewScreen = () => {
   const [activePanel, setActivePanel] = useState(null);
   const [timer, setTimer] = useState('00:00');
 
-  // Whiteboard Fullscreen State (synced via socket)
+  // Whiteboard States (synced via socket)
   const [whiteboardFullscreen, setWhiteboardFullscreen] = useState(false);
+
+  // Question States (synced via socket) - DEFAULT FALSE
+  const [questionFullscreen, setQuestionFullscreen] = useState(false);
+  const [questionVisibleToCandidate, setQuestionVisibleToCandidate] =
+    useState(false);
 
   // Media States
   const [camOn, setCamOn] = useState(
@@ -84,6 +89,54 @@ const InterviewScreen = () => {
   const peerConnections = useRef({});
   const pendingCandidates = useRef({});
   const remoteVideoRefs = useRef({});
+
+  // NEW: Refs to track sync state (avoids re-renders and infinite loops)
+  const questionsSyncedRef = useRef(false);
+  const questionsRef = useRef([]);
+
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin';
+  const isCandidate = user?.role === 'candidate';
+
+  // Keep questionsRef in sync with questions state
+  useEffect(() => {
+    questionsRef.current = questions;
+  }, [questions]);
+
+  // ============================================
+  // EFFECT: Close question panel for candidate when visibility is turned off
+  // ============================================
+  useEffect(() => {
+    if (isCandidate && !questionVisibleToCandidate) {
+      if (activePanel === 'question') {
+        console.log('📝 Question hidden from candidate, switching to chat');
+        setActivePanel('chat');
+      }
+    }
+  }, [questionVisibleToCandidate, isCandidate, activePanel]);
+
+  // ============================================
+  // EFFECT: Admin syncs questions to socket when questions are loaded (ONCE)
+  // ============================================
+  useEffect(() => {
+    if (
+      isAdmin &&
+      questions.length > 0 &&
+      socketRef.current?.connected &&
+      actualRoomId &&
+      !questionsSyncedRef.current
+    ) {
+      console.log(
+        '📤 Admin syncing questions to socket (initial):',
+        questions.length
+      );
+      socketRef.current.emit('question-sync-data', {
+        meetingId: actualRoomId,
+        questions: questions,
+      });
+      questionsSyncedRef.current = true;
+    }
+  }, [isAdmin, questions, actualRoomId]);
 
   // ============================================
   // TIMER EFFECT
@@ -171,52 +224,42 @@ const InterviewScreen = () => {
       }
     };
 
+    // ============================================
+    // FETCH QUESTIONS - ONLY FOR ADMIN
+    // ============================================
     const fetchQuestions = async (meeting) => {
+      // CANDIDATE WILL GET QUESTIONS VIA SOCKET, NOT API
+      if (isCandidate) {
+        console.log('👤 Candidate will receive questions via socket');
+        setQuestions([]);
+        return;
+      }
+
+      // ADMIN FETCHES QUESTIONS FROM API
       if (meeting?.assignedQuestions?.length > 0) {
         try {
           const questionIds = meeting.assignedQuestions.map(
             (q) => q.question?._id || q.question || q._id || q
           );
+          console.log('📚 Admin fetching questions:', questionIds);
+
           const res = await axios.get(`${API_BASE_URL}/question/`, {
             params: { ids: questionIds.join(',') },
             headers,
           });
-          setQuestions(res.data.data || []);
+
+          const fetchedQuestions = res.data.data || [];
+          console.log('✅ Admin fetched questions:', fetchedQuestions.length);
+          setQuestions(fetchedQuestions);
+          questionsSyncedRef.current = false; // Reset to trigger sync
         } catch (err) {
           console.error('Error fetching questions:', err);
-          loadDefaultQuestion();
+          setQuestions([]);
         }
       } else {
-        loadDefaultQuestion();
+        console.log('⚠️ No assigned questions found');
+        setQuestions([]);
       }
-    };
-
-    const loadDefaultQuestion = () => {
-      setQuestions([
-        {
-          _id: 'default-1',
-          title: 'Two Sum',
-          description: 'Find two numbers that add up to target.',
-          problemStatement:
-            'Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.',
-          examples: [
-            {
-              input: 'nums = [2,7,11,15], target = 9',
-              output: '[0,1]',
-              explanation: 'nums[0] + nums[1] = 2 + 7 = 9',
-            },
-          ],
-          constraints: ['2 <= nums.length <= 10^4'],
-          starterCode: {
-            javascript: {
-              code: 'function twoSum(nums, target) {\n  // Your code here\n}',
-            },
-            python: {
-              code: 'def two_sum(nums, target):\n    # Your code here\n    pass',
-            },
-          },
-        },
-      ]);
     };
 
     const fetchMeetingData = async () => {
@@ -265,7 +308,7 @@ const InterviewScreen = () => {
         setActualRoomId(roomIdToUse);
         setMeetingData(meeting);
 
-        if (user?.role === 'admin') {
+        if (isAdmin) {
           await fetchCandidateData(meeting);
         }
 
@@ -280,7 +323,7 @@ const InterviewScreen = () => {
     if (meetingId && user) {
       fetchMeetingData();
     }
-  }, [meetingId, user]);
+  }, [meetingId, user, isAdmin, isCandidate]);
 
   // ============================================
   // MEDIA STREAM MANAGEMENT
@@ -578,6 +621,29 @@ const InterviewScreen = () => {
 
       // Request current whiteboard settings on connect
       socket.emit('whiteboard-get-settings', { meetingId: actualRoomId });
+
+      // Request current question settings on connect
+      socket.emit('question-get-settings', { meetingId: actualRoomId });
+
+      // If admin and questions already loaded, sync them (use ref to avoid dependency)
+      if (
+        user?.role === 'admin' &&
+        questionsRef.current.length > 0 &&
+        !questionsSyncedRef.current
+      ) {
+        console.log('📤 Admin syncing questions after connect');
+        socket.emit('question-sync-data', {
+          meetingId: actualRoomId,
+          questions: questionsRef.current,
+        });
+        questionsSyncedRef.current = true;
+      }
+
+      // If candidate, request questions
+      if (user?.role === 'candidate') {
+        console.log('👤 Candidate requesting questions');
+        socket.emit('question-request-data', { meetingId: actualRoomId });
+      }
     });
 
     socket.on('disconnect', (reason) => {
@@ -607,8 +673,11 @@ const InterviewScreen = () => {
       });
     });
 
+    // NEW PARTICIPANT - Don't sync questions here to avoid loop
     socket.on('newParticipant', (newUser) => {
-      console.log('New participant:', newUser.name);
+      console.log('New participant joined:', newUser.name);
+      // Questions will be sent via question-get-settings when they request
+      // No need to emit here - this was causing the infinite loop
     });
 
     socket.on('sendOfferTo', ({ targetSocketId, targetUser }) => {
@@ -624,13 +693,14 @@ const InterviewScreen = () => {
     socket.on('answer', handleAnswer);
     socket.on('ice-candidate', handleIceCandidate);
 
-    // Listen for whiteboard fullscreen events
+    // ========================================
+    // WHITEBOARD SOCKET EVENTS
+    // ========================================
     socket.on('whiteboard-fullscreen', ({ isFullscreen }) => {
       console.log('🖥️ Whiteboard fullscreen received:', isFullscreen);
       setWhiteboardFullscreen(isFullscreen);
     });
 
-    // Listen for whiteboard settings (on initial load)
     socket.on('whiteboard-settings', ({ isFullscreen, isLocked }) => {
       console.log('📋 Whiteboard settings received:', {
         isFullscreen,
@@ -639,6 +709,98 @@ const InterviewScreen = () => {
       if (isFullscreen !== undefined) {
         setWhiteboardFullscreen(isFullscreen);
       }
+    });
+
+    // ========================================
+    // QUESTION SOCKET EVENTS
+    // ========================================
+    socket.on('question-visibility', ({ isVisible }) => {
+      console.log('👁️ Question visibility received:', isVisible);
+      setQuestionVisibleToCandidate(isVisible);
+
+      // If candidate and visibility turned ON, request questions
+      if (user?.role === 'candidate' && isVisible) {
+        console.log('👤 Candidate requesting questions after visibility ON');
+        socket.emit('question-request-data', { meetingId: actualRoomId });
+      }
+    });
+
+    socket.on('question-fullscreen', ({ isFullscreen }) => {
+      console.log('🖥️ Question fullscreen received:', isFullscreen);
+      setQuestionFullscreen(isFullscreen);
+    });
+
+    socket.on('question-change', ({ questionIndex }) => {
+      console.log('📝 Question change received:', questionIndex);
+      setCurrentQuestionIndex(questionIndex);
+    });
+
+    socket.on(
+      'question-settings',
+      ({ isVisible, isFullscreen, currentQuestionIndex: qIndex }) => {
+        console.log('📋 Question settings received:', {
+          isVisible,
+          isFullscreen,
+          qIndex,
+        });
+        setQuestionVisibleToCandidate(isVisible === true);
+        if (isFullscreen !== undefined) {
+          setQuestionFullscreen(isFullscreen);
+        }
+        if (qIndex !== undefined) {
+          setCurrentQuestionIndex(qIndex);
+        }
+      }
+    );
+
+    // ========================================
+    // QUESTION DATA SYNC (CANDIDATE RECEIVES QUESTIONS)
+    // ========================================
+    socket.on(
+      'question-data-sync',
+      ({
+        questions: syncedQuestions,
+        currentQuestionIndex: qIndex,
+        cleared,
+        notAvailable,
+      }) => {
+        console.log('📥 Question data sync received:', {
+          count: syncedQuestions?.length || 0,
+          cleared,
+          notAvailable,
+        });
+
+        // Only update for candidates
+        if (user?.role !== 'candidate') {
+          return;
+        }
+
+        if (cleared || notAvailable) {
+          setQuestions([]);
+          setCurrentQuestionIndex(0);
+          return;
+        }
+
+        if (syncedQuestions && syncedQuestions.length > 0) {
+          console.log(
+            '✅ Candidate received questions:',
+            syncedQuestions.length
+          );
+          setQuestions(syncedQuestions);
+          if (qIndex !== undefined) {
+            setCurrentQuestionIndex(qIndex);
+          }
+        }
+      }
+    );
+
+    // ========================================
+    // QUESTION SYNC CONFIRMED (ADMIN ONLY)
+    // ========================================
+    socket.on('question-sync-confirmed', ({ count, meetingId: roomId }) => {
+      console.log(
+        `✅ Questions sync confirmed: ${count} questions in room ${roomId}`
+      );
     });
 
     return () => {
@@ -836,6 +998,7 @@ const InterviewScreen = () => {
               meetingData={meetingData}
               user={user}
               candidateData={candidateData}
+              questionVisibleToCandidate={questionVisibleToCandidate}
             />
           </div>
 
@@ -877,6 +1040,10 @@ const InterviewScreen = () => {
           loadingCandidate={loadingCandidate}
           whiteboardFullscreen={whiteboardFullscreen}
           setWhiteboardFullscreen={setWhiteboardFullscreen}
+          questionFullscreen={questionFullscreen}
+          setQuestionFullscreen={setQuestionFullscreen}
+          questionVisibleToCandidate={questionVisibleToCandidate}
+          setQuestionVisibleToCandidate={setQuestionVisibleToCandidate}
         />
       </div>
     </div>

@@ -3,15 +3,20 @@ import chatService from '../services/chat.service.js';
 import {
   setupWhiteboardHandlers,
   cleanupWhiteboardRoom,
-} from './whiteboardHandler.js';
-
+} from './sockethandler/whiteboardHandler.js';
+import {
+  setupQuestionHandlers,
+  cleanupQuestionRoom,
+} from './sockethandler/questionHandler.js';
 const interviewRooms = {};
 const pendingIceCandidates = {};
 const typingUsers = {};
 
 export const setupSocketHandlers = (io) => {
   io.on('connection', (socket) => {
+    // Setup handlers
     setupWhiteboardHandlers(io, socket);
+    setupQuestionHandlers(io, socket);
 
     // ========================================
     // ROOM MANAGEMENT EVENTS
@@ -287,6 +292,7 @@ function handleUserLeave(socket, meetingId, userId, io) {
       delete interviewRooms[meetingId];
       delete typingUsers[meetingId];
       cleanupWhiteboardRoom(meetingId);
+      cleanupQuestionRoom(meetingId);
       console.log(`🗑️ Room ${meetingId} deleted (empty)`);
     }
   }
