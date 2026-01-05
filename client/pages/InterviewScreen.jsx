@@ -676,8 +676,6 @@ const InterviewScreen = () => {
     // NEW PARTICIPANT - Don't sync questions here to avoid loop
     socket.on('newParticipant', (newUser) => {
       console.log('New participant joined:', newUser.name);
-      // Questions will be sent via question-get-settings when they request
-      // No need to emit here - this was causing the infinite loop
     });
 
     socket.on('sendOfferTo', ({ targetSocketId, targetUser }) => {
@@ -801,6 +799,29 @@ const InterviewScreen = () => {
       console.log(
         `✅ Questions sync confirmed: ${count} questions in room ${roomId}`
       );
+    });
+
+    // ========================================
+    // CODE SYNC EVENTS (NEW)
+    // ========================================
+    socket.on('code-sync', (data) => {
+      console.log('💻 Code sync received:', {
+        fromUserName: data.fromUserName,
+        fromUserRole: data.fromUserRole,
+        codeLength: data.code?.length || 0,
+        isFullSync: data.isFullSync,
+        isReset: data.isReset,
+      });
+      // Note: The actual code update is handled in QuestionPanel component
+      // This is just for logging/debugging at InterviewScreen level
+    });
+
+    socket.on('language-sync', (data) => {
+      console.log('🔤 Language sync received:', {
+        language: data.language,
+        fromUserName: data.fromUserName,
+      });
+      // Note: The actual language update is handled in QuestionPanel component
     });
 
     return () => {

@@ -35,6 +35,9 @@ const RightPanel = ({
 }) => {
   const isAdmin = user?.role === 'admin';
 
+  // Get candidateId - either from candidateData (for admin) or from user (for candidate)
+  const candidateId = isAdmin ? candidateData?._id : user?.id;
+
   // If whiteboard is fullscreen, render it separately
   if (activePanel === 'whiteboard' && whiteboardFullscreen) {
     return (
@@ -65,6 +68,8 @@ const RightPanel = ({
         onVisibilityChange={setQuestionVisibleToCandidate}
         socket={socket}
         meetingId={meetingId}
+        candidateId={candidateId}
+        user={user}
       />
     );
   }
@@ -98,6 +103,8 @@ const RightPanel = ({
           onVisibilityChange={setQuestionVisibleToCandidate}
           socket={socket}
           meetingId={meetingId}
+          candidateId={candidateId}
+          user={user}
         />
       )}
 

@@ -1,4 +1,4 @@
-// Custom hook for code execution
+// hooks/useCodeExecution.js
 import { useState, useCallback } from 'react';
 import { codeApi } from '../services/api';
 import { toast } from 'sonner';
@@ -204,6 +204,10 @@ export const useCodeExecution = ({
     runCode,
     submitCode,
     clearOutput,
+
+    // Setters for external updates (socket sync)
+    setOutput,
+    setTestResults,
   };
 };
 

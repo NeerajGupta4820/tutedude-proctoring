@@ -1,7 +1,8 @@
 // config/sockethandler/questionHandler.js
 
 const questionSettings = {};
-const roomQuestions = {}; // Store questions data per room
+const roomQuestions = {};
+const roomCodeState = {};
 
 export const setupQuestionHandlers = (io, socket) => {
   // ========================================
@@ -16,7 +17,6 @@ export const setupQuestionHandlers = (io, socket) => {
       return;
     }
 
-    // Only admin can sync questions
     if (user?.role !== 'admin') {
       console.log(`❌ Non-admin (${user?.role}) tried to sync questions`);
       return;
@@ -27,10 +27,8 @@ export const setupQuestionHandlers = (io, socket) => {
       return;
     }
 
-    // Store questions for this room
     roomQuestions[meetingId] = questions;
 
-    // Initialize settings if needed
     if (!questionSettings[meetingId]) {
       questionSettings[meetingId] = {
         isVisible: false,
@@ -39,22 +37,27 @@ export const setupQuestionHandlers = (io, socket) => {
       };
     }
 
-    console.log(
-      `📚 Admin synced ${questions.length} questions for room ${meetingId}`
-    );
+    if (!roomCodeState[meetingId]) {
+      roomCodeState[meetingId] = {
+        code: '',
+        language: 'javascript',
+        starterCode: '',
+        lastUpdatedBy: null,
+        lastUpdatedAt: null,
+      };
+    }
 
-    // Confirm sync to admin
+    console.log(`📚 Admin synced ${questions.length} questions for room ${meetingId}`);
+
     socket.emit('question-sync-confirmed', {
       count: questions.length,
       meetingId: meetingId,
     });
 
-    // If visibility is already ON, broadcast questions to all
     if (questionSettings[meetingId].isVisible) {
       socket.to(meetingId).emit('question-data-sync', {
         questions: questions,
-        currentQuestionIndex:
-          questionSettings[meetingId].currentQuestionIndex || 0,
+        currentQuestionIndex: questionSettings[meetingId].currentQuestionIndex || 0,
       });
       console.log(`📤 Questions auto-broadcasted (visibility was ON)`);
     }
@@ -72,19 +75,13 @@ export const setupQuestionHandlers = (io, socket) => {
       return;
     }
 
-    // Only admin can toggle visibility
     if (user?.role !== 'admin') {
-      console.log(
-        `❌ Non-admin (${user?.role}) tried to toggle question visibility`
-      );
+      console.log(`❌ Non-admin (${user?.role}) tried to toggle question visibility`);
       return;
     }
 
-    console.log(
-      `👁️ Question visibility ${isVisible ? 'ON' : 'OFF'} in room ${meetingId} by ${user?.name}`
-    );
+    console.log(`👁️ Question visibility ${isVisible ? 'ON' : 'OFF'} in room ${meetingId} by ${user?.name}`);
 
-    // Initialize room settings if not exists
     if (!questionSettings[meetingId]) {
       questionSettings[meetingId] = {
         isVisible: false,
@@ -95,27 +92,31 @@ export const setupQuestionHandlers = (io, socket) => {
 
     questionSettings[meetingId].isVisible = isVisible;
 
-    // Broadcast visibility change to ALL users in room
     io.to(meetingId).emit('question-visibility', {
       isVisible: isVisible,
       socketId: socket.id,
       userName: user?.name || 'Admin',
     });
 
-    // If visibility turned ON and we have questions, send them to candidates
     if (isVisible && roomQuestions[meetingId]?.length > 0) {
-      // Send questions to all OTHER users (candidates)
       socket.to(meetingId).emit('question-data-sync', {
         questions: roomQuestions[meetingId],
-        currentQuestionIndex:
-          questionSettings[meetingId].currentQuestionIndex || 0,
+        currentQuestionIndex: questionSettings[meetingId].currentQuestionIndex || 0,
       });
-      console.log(
-        `📤 Questions sent to candidates: ${roomQuestions[meetingId].length} questions`
-      );
+      console.log(`📤 Questions sent to candidates: ${roomQuestions[meetingId].length} questions`);
+
+      if (roomCodeState[meetingId]?.code) {
+        socket.to(meetingId).emit('code-sync', {
+          code: roomCodeState[meetingId].code,
+          language: roomCodeState[meetingId].language,
+          questionIndex: questionSettings[meetingId].currentQuestionIndex || 0,
+          fromUserId: roomCodeState[meetingId].lastUpdatedBy,
+          isFullSync: true,
+        });
+        console.log(`📤 Code state sent to candidates`);
+      }
     }
 
-    // If visibility turned OFF, tell candidates to clear questions
     if (!isVisible) {
       socket.to(meetingId).emit('question-data-sync', {
         questions: [],
@@ -139,15 +140,11 @@ export const setupQuestionHandlers = (io, socket) => {
     }
 
     if (user?.role !== 'admin') {
-      console.log(
-        `❌ Non-admin (${user?.role}) tried to toggle question fullscreen`
-      );
+      console.log(`❌ Non-admin (${user?.role}) tried to toggle question fullscreen`);
       return;
     }
 
-    console.log(
-      `🖥️ Question fullscreen ${isFullscreen ? 'ON' : 'OFF'} in room ${meetingId}`
-    );
+    console.log(`🖥️ Question fullscreen ${isFullscreen ? 'ON' : 'OFF'} in room ${meetingId}`);
 
     if (!questionSettings[meetingId]) {
       questionSettings[meetingId] = {
@@ -159,7 +156,6 @@ export const setupQuestionHandlers = (io, socket) => {
 
     questionSettings[meetingId].isFullscreen = isFullscreen;
 
-    // Broadcast to ALL users in room
     io.to(meetingId).emit('question-fullscreen', {
       isFullscreen: isFullscreen,
       socketId: socket.id,
@@ -184,9 +180,7 @@ export const setupQuestionHandlers = (io, socket) => {
       return;
     }
 
-    console.log(
-      `📝 Question changed to index ${questionIndex} in room ${meetingId}`
-    );
+    console.log(`📝 Question changed to index ${questionIndex} in room ${meetingId}`);
 
     if (!questionSettings[meetingId]) {
       questionSettings[meetingId] = {
@@ -198,11 +192,29 @@ export const setupQuestionHandlers = (io, socket) => {
 
     questionSettings[meetingId].currentQuestionIndex = questionIndex;
 
-    // Broadcast to ALL users in room
+    // Reset code state for new question
+    if (roomCodeState[meetingId]) {
+      roomCodeState[meetingId] = {
+        code: '',
+        language: roomCodeState[meetingId].language || 'javascript',
+        starterCode: '',
+        lastUpdatedBy: null,
+        lastUpdatedAt: null,
+      };
+    }
+
     io.to(meetingId).emit('question-change', {
       questionIndex: questionIndex,
       socketId: socket.id,
       userName: user?.name || 'Admin',
+    });
+
+    // Broadcast code reset
+    io.to(meetingId).emit('code-sync', {
+      code: '',
+      language: roomCodeState[meetingId]?.language || 'javascript',
+      questionIndex: questionIndex,
+      isReset: true,
     });
   });
 
@@ -221,31 +233,31 @@ export const setupQuestionHandlers = (io, socket) => {
       currentQuestionIndex: 0,
     };
 
-    console.log(
-      `📋 Sending question settings to ${user?.name || socket.id} (${user?.role}):`,
-      settings
-    );
+    console.log(`📋 Sending question settings to ${user?.name || socket.id} (${user?.role}):`, settings);
 
-    // Send settings to requester
     socket.emit('question-settings', {
       isVisible: settings.isVisible === true,
       isFullscreen: settings.isFullscreen === true,
       currentQuestionIndex: settings.currentQuestionIndex || 0,
     });
 
-    // If user is candidate AND visibility is ON AND we have questions, send them
-    if (
-      user?.role === 'candidate' &&
-      settings.isVisible &&
-      roomQuestions[meetingId]?.length > 0
-    ) {
+    if (user?.role === 'candidate' && settings.isVisible && roomQuestions[meetingId]?.length > 0) {
       socket.emit('question-data-sync', {
         questions: roomQuestions[meetingId],
         currentQuestionIndex: settings.currentQuestionIndex || 0,
       });
-      console.log(
-        `📤 Sent ${roomQuestions[meetingId].length} questions to joining candidate`
-      );
+      console.log(`📤 Sent ${roomQuestions[meetingId].length} questions to joining candidate`);
+
+      if (roomCodeState[meetingId]?.code) {
+        socket.emit('code-sync', {
+          code: roomCodeState[meetingId].code,
+          language: roomCodeState[meetingId].language,
+          questionIndex: settings.currentQuestionIndex || 0,
+          fromUserId: roomCodeState[meetingId].lastUpdatedBy,
+          isFullSync: true,
+        });
+        console.log(`📤 Sent code state to joining candidate`);
+      }
     }
   });
 
@@ -260,13 +272,22 @@ export const setupQuestionHandlers = (io, socket) => {
 
     const settings = questionSettings[meetingId];
 
-    // Only send if visibility is ON
     if (settings?.isVisible && roomQuestions[meetingId]?.length > 0) {
       socket.emit('question-data-sync', {
         questions: roomQuestions[meetingId],
         currentQuestionIndex: settings.currentQuestionIndex || 0,
       });
       console.log(`📤 Questions sent on request to ${user?.name || socket.id}`);
+
+      if (roomCodeState[meetingId]?.code) {
+        socket.emit('code-sync', {
+          code: roomCodeState[meetingId].code,
+          language: roomCodeState[meetingId].language,
+          questionIndex: settings.currentQuestionIndex || 0,
+          fromUserId: roomCodeState[meetingId].lastUpdatedBy,
+          isFullSync: true,
+        });
+      }
     } else {
       socket.emit('question-data-sync', {
         questions: [],
@@ -274,6 +295,189 @@ export const setupQuestionHandlers = (io, socket) => {
         notAvailable: true,
       });
       console.log(`❌ Questions not available for ${user?.name || socket.id}`);
+    }
+  });
+
+  // ========================================
+  // 7️⃣ CODE SYNC - REAL-TIME CODE SHARING
+  // ========================================
+  socket.on('code-change', (data) => {
+    const { meetingId, code, language, questionIndex, isReset } = data;
+    const user = socket.userData;
+
+    if (!meetingId) {
+      console.error('❌ code-change: Missing meetingId');
+      return;
+    }
+
+    // Initialize code state if not exists
+    if (!roomCodeState[meetingId]) {
+      roomCodeState[meetingId] = {
+        code: '',
+        language: 'javascript',
+        starterCode: '',
+        lastUpdatedBy: null,
+        lastUpdatedAt: null,
+      };
+    }
+
+    // Update code state
+    roomCodeState[meetingId] = {
+      ...roomCodeState[meetingId],
+      code: code,
+      language: language || roomCodeState[meetingId].language,
+      lastUpdatedBy: user?.id || socket.id,
+      lastUpdatedAt: Date.now(),
+      questionIndex: questionIndex,
+    };
+
+    // Broadcast to all OTHER users in the room
+    socket.to(meetingId).emit('code-sync', {
+      code: code,
+      language: language,
+      questionIndex: questionIndex,
+      fromUserId: user?.id,
+      fromUserName: user?.name,
+      fromUserRole: user?.role,
+      timestamp: Date.now(),
+      isReset: isReset || false,
+    });
+
+    // Log occasionally to avoid spam
+    if (Math.random() < 0.05) {
+      console.log(`💻 Code update in room ${meetingId} by ${user?.name} (${user?.role})`);
+    }
+  });
+
+  // ========================================
+  // 8️⃣ LANGUAGE CHANGE - WITH STARTER CODE
+  // ========================================
+  socket.on('language-change', (data) => {
+    const { meetingId, language, starterCode, questionIndex } = data;
+    const user = socket.userData;
+
+    if (!meetingId) return;
+
+    // Initialize code state if not exists
+    if (!roomCodeState[meetingId]) {
+      roomCodeState[meetingId] = {
+        code: '',
+        language: 'javascript',
+        starterCode: '',
+        lastUpdatedBy: null,
+        lastUpdatedAt: null,
+      };
+    }
+
+    // Update language and starter code
+    roomCodeState[meetingId].language = language;
+    roomCodeState[meetingId].starterCode = starterCode || '';
+    roomCodeState[meetingId].code = starterCode || '';
+    roomCodeState[meetingId].lastUpdatedBy = user?.id || socket.id;
+    roomCodeState[meetingId].lastUpdatedAt = Date.now();
+
+    console.log(`🔤 Language changed to ${language} in room ${meetingId} by ${user?.name}`);
+
+    // Broadcast to all OTHER users WITH starter code
+    socket.to(meetingId).emit('language-sync', {
+      language: language,
+      starterCode: starterCode,
+      questionIndex: questionIndex,
+      fromUserId: user?.id,
+      fromUserName: user?.name,
+      fromUserRole: user?.role,
+    });
+  });
+
+  // ========================================
+  // 9️⃣ REQUEST CURRENT CODE STATE
+  // ========================================
+  socket.on('code-request-state', (data) => {
+    const { meetingId } = data;
+    const user = socket.userData;
+
+    if (!meetingId) return;
+
+    const codeState = roomCodeState[meetingId];
+    const settings = questionSettings[meetingId];
+
+    if (codeState && codeState.code) {
+      socket.emit('code-sync', {
+        code: codeState.code,
+        language: codeState.language,
+        questionIndex: settings?.currentQuestionIndex || 0,
+        fromUserId: codeState.lastUpdatedBy,
+        isFullSync: true,
+      });
+      console.log(`📤 Code state sent to ${user?.name || socket.id}`);
+    }
+  });
+
+  // ========================================
+  // 🔟 OUTPUT SYNC - RUN/SUBMIT RESULTS SHARING
+  // ========================================
+  socket.on('code-output-sync', (data) => {
+    const { 
+      meetingId, 
+      output, 
+      type, 
+      fromUserId, 
+      fromUserName, 
+      fromUserRole,
+      shareWithCandidate 
+    } = data;
+    const user = socket.userData;
+
+    if (!meetingId) {
+      console.error('❌ code-output-sync: Missing meetingId');
+      return;
+    }
+
+    console.log(`📊 Output sync from ${fromUserName} (${fromUserRole}), type: ${type}, shareWithCandidate: ${shareWithCandidate}`);
+
+    // Get all sockets in the room
+    const room = io.sockets.adapter.rooms.get(meetingId);
+    if (!room) return;
+
+    // Iterate through all sockets in room
+    for (const socketId of room) {
+      if (socketId === socket.id) continue; // Skip sender
+
+      const targetSocket = io.sockets.sockets.get(socketId);
+      if (!targetSocket) continue;
+
+      const targetUser = targetSocket.userData;
+
+      // Determine if we should send to this user
+      let shouldSend = false;
+
+      if (fromUserRole === 'candidate') {
+        // Candidate's output always goes to admin
+        if (targetUser?.role === 'admin') {
+          shouldSend = true;
+        }
+      } else if (fromUserRole === 'admin') {
+        // Admin's output goes to candidate ONLY if shareWithCandidate is true
+        if (targetUser?.role === 'candidate' && shareWithCandidate) {
+          shouldSend = true;
+        }
+        // Admin's output always goes to other admins
+        if (targetUser?.role === 'admin') {
+          shouldSend = true;
+        }
+      }
+
+      if (shouldSend) {
+        targetSocket.emit('code-output-sync', {
+          output: output,
+          type: type,
+          fromUserId: fromUserId,
+          fromUserName: fromUserName,
+          fromUserRole: fromUserRole,
+          shareWithCandidate: shareWithCandidate,
+        });
+        console.log(`📤 Output sent to ${targetUser?.name} (${targetUser?.role})`);
+      }
     }
   });
 };
@@ -288,7 +492,10 @@ export const cleanupQuestionRoom = (meetingId) => {
   if (roomQuestions[meetingId]) {
     delete roomQuestions[meetingId];
   }
-  console.log(`🧹 Question settings & data cleaned for room ${meetingId}`);
+  if (roomCodeState[meetingId]) {
+    delete roomCodeState[meetingId];
+  }
+  console.log(`🧹 Question settings, data & code cleaned for room ${meetingId}`);
 };
 
 // ========================================
@@ -298,6 +505,7 @@ export const getQuestionRoomInfo = (meetingId) => {
   return {
     settings: questionSettings[meetingId] || null,
     questionsCount: roomQuestions[meetingId]?.length || 0,
+    codeState: roomCodeState[meetingId] || null,
   };
 };
 
