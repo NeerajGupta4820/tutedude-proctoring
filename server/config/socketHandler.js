@@ -36,7 +36,12 @@ export const setupSocketHandlers = (io) => {
         interviewRooms[meetingId] = [];
       }
 
-      const userWithSocket = { ...user, socketId: socket.id };
+      const userWithSocket = {
+        ...user,
+        socketId: socket.id,
+        isCamOn: user.isCamOn || true, // Default to true if not provided
+        isMicOn: user.isMicOn || true,
+      };
 
       const oldEntry = interviewRooms[meetingId].find((u) => u.id === user.id);
       if (oldEntry) {
@@ -103,6 +108,28 @@ export const setupSocketHandlers = (io) => {
 
     socket.on('ice-candidate', ({ meetingId, candidate, to }) => {
       io.to(to).emit('ice-candidate', { candidate, from: socket.id });
+    });
+
+    // ========================================
+    // MEDIA STATE EVENTS
+    // ========================================
+
+    socket.on('mediaStateUpdate', ({ meetingId, isCamOn, isMicOn }) => {
+      const room = interviewRooms[meetingId];
+      if (room) {
+        const participant = room.find((p) => p.socketId === socket.id);
+        if (participant) {
+          participant.isCamOn = isCamOn;
+          participant.isMicOn = isMicOn;
+
+          // Broadcast update to others
+          socket.to(meetingId).emit('participantMediaUpdate', {
+            socketId: socket.id,
+            isCamOn,
+            isMicOn,
+          });
+        }
+      }
     });
 
     // ========================================

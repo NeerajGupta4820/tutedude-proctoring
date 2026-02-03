@@ -18,7 +18,7 @@ const RemoteVideo = ({
   return (
     <div className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow">
       <div className="relative w-full h-full min-h-[400px] bg-gray-900 flex justify-center items-center">
-        {remoteStream ? (
+        {remoteStream && participant.isCamOn !== false ? (
           <>
             <video
               ref={(el) => {
