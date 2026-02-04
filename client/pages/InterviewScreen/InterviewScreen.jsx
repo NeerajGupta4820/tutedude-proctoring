@@ -61,10 +61,69 @@ const InterviewScreen = () => {
 
   // 3. WebRTC (Video calling)
   const {
-    participants, setParticipants,
+    participants, setParticipants, syncParticipantsFromServer,
     createPeerConnection, cleanupPeerConnection, cleanupAllConnections, updateStreamInConnections, 
     remoteStreams, connectionStates
   } = useWebRTC(socket, actualRoomId, isConnected, localStream);
+
+  // 4. Signaling & Participant Management Logic
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const onNewParticipant = (participant) => {
+      console.log('👤 New participant:', participant.name, participant.socketId);
+      setParticipants(prev => {
+        if (prev.find(p => p.socketId === participant.socketId)) return prev;
+        return [...prev, participant];
+      });
+      // Start WebRTC connection with the new participant
+      createPeerConnection(participant.socketId);
+    };
+
+    const onExistingParticipants = (existingUsers) => {
+      console.log('👥 Existing participants:', existingUsers.length);
+      setParticipants(prev => {
+        const combined = [...prev];
+        existingUsers.forEach(u => {
+          if (!combined.find(p => p.socketId === u.socketId)) combined.push(u);
+        });
+        return combined;
+      });
+      // Start WebRTC connections with all existing participants
+      existingUsers.forEach(u => {
+        createPeerConnection(u.socketId);
+      });
+    };
+
+    const onParticipantsUpdate = (list) => {
+      syncParticipantsFromServer(list);
+    };
+
+    const onParticipantLeft = ({ socketId }) => {
+      console.log('👋 Participant left:', socketId);
+      cleanupPeerConnection(socketId);
+    };
+
+    const onSendOfferTo = ({ targetSocketId }) => {
+      console.log('📞 SendOfferTo:', targetSocketId);
+      createPeerConnection(targetSocketId);
+    };
+
+    socket.on('newParticipant', onNewParticipant);
+    socket.on('existingParticipants', onExistingParticipants);
+    socket.on('participantsUpdate', onParticipantsUpdate);
+    socket.on('participantLeft', onParticipantLeft);
+    socket.on('sendOfferTo', onSendOfferTo);
+
+    return () => {
+      socket.off('newParticipant', onNewParticipant);
+      socket.off('existingParticipants', onExistingParticipants);
+      socket.off('participantsUpdate', onParticipantsUpdate);
+      socket.off('participantLeft', onParticipantLeft);
+      socket.off('sendOfferTo', onSendOfferTo);
+    };
+  }, [socket, isConnected, setParticipants, syncParticipantsFromServer, cleanupPeerConnection, createPeerConnection]);
+
 
   const remoteVideoRefs = useRef({});
 
@@ -73,7 +132,30 @@ const InterviewScreen = () => {
 
   // --- Effects & Logic ---
 
-  // Keep questions logic simple here as it's complex to fully extract without refactoring subcomponents
+  // Emit join event once connected - use ref to prevent duplicate joins
+  const hasJoinedRef = useRef(false);
+  useEffect(() => {
+    if (isConnected && socket && user && actualRoomId && !hasJoinedRef.current) {
+      hasJoinedRef.current = true;
+      console.log('📡 Emitting joinInterview:', { actualRoomId, camOn, micOn });
+      socket.emit('joinInterview', {
+        meetingId: actualRoomId,
+        user: {
+          id: user.id || user._id,
+          name: user.name,
+          role: user.role,
+        },
+        isCamOn: camOn,
+        isMicOn: micOn
+      });
+    }
+    // Reset ref if socket disconnects
+    if (!isConnected) {
+      hasJoinedRef.current = false;
+    }
+  }, [isConnected, socket, user, actualRoomId]);
+
+  // Keep questions logic simple here
   const questionsRef = useRef([]);
   useEffect(() => {
     questionsRef.current = questions;
@@ -97,44 +179,6 @@ const InterviewScreen = () => {
     }
   }, [isAdmin, questions, actualRoomId, socket, questionsSyncedRef]);
 
-  // WebRTC & Socket Glue
-  useEffect(() => {
-    if (!socket) return;
-    
-    const onExistingParticipants = (existingUsers) => {
-        existingUsers.forEach((p) => {
-            if (p.id !== user.id) createPeerConnection(p.socketId, true);
-        });
-    };
-
-    const onSendOfferTo = ({ targetSocketId }) => {
-        createPeerConnection(targetSocketId, true);
-    };
-
-    const onParticipantLeft = ({ odlid }) => {
-        cleanupPeerConnection(odlid);
-    };
-    
-    const onParticipantsUpdate = (list) => {
-         setParticipants(list.map(p => ({
-             ...p,
-             stream: remoteStreams[p.socketId] || undefined
-         })));
-    };
-
-    socket.on('existingParticipants', onExistingParticipants);
-    socket.on('sendOfferTo', onSendOfferTo);
-    socket.on('participantLeft', onParticipantLeft);
-    socket.on('participantsUpdate', onParticipantsUpdate);
-
-    return () => {
-        socket.off('existingParticipants', onExistingParticipants);
-        socket.off('sendOfferTo', onSendOfferTo);
-        socket.off('participantLeft', onParticipantLeft);
-        socket.off('participantsUpdate', onParticipantsUpdate);
-    };
-  }, [socket, user, createPeerConnection, cleanupPeerConnection, remoteStreams, setParticipants]);
-
 
   // Timer
   useEffect(() => {
@@ -148,7 +192,7 @@ const InterviewScreen = () => {
       return () => clearInterval(interval);
   }, []);
 
-  // Ready to Connect
+  // Ready to Connect - Start signaling if local stream is ready
   useEffect(() => {
       if (localStream && socket?.connected && actualRoomId) {
           socket.emit('readyToConnect', { meetingId: actualRoomId });
@@ -317,6 +361,7 @@ const InterviewScreen = () => {
               connectionStates={connectionStates}
               remoteVideoRefs={remoteVideoRefs}
               showParticipants={showParticipants}
+              socket={socket}
               onCloseParticipants={() => setShowParticipants(false)}
               onRetryConnection={(socketId) =>
                 createPeerConnection(socketId, true)

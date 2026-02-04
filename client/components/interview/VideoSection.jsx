@@ -15,10 +15,11 @@ const VideoSection = ({
   connectionStates,
   remoteVideoRefs,
   showParticipants,
+  socket,
   onCloseParticipants,
   onRetryConnection,
 }) => {
-  const remoteParticipants = participants.filter((p) => p.id !== user?.id);
+  const remoteParticipants = participants.filter((p) => p.socketId !== socket?.id);
 
   return (
     <div className="flex-1 p-6 overflow-auto relative">

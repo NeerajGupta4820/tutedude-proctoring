@@ -22,7 +22,7 @@ export const setupSocketHandlers = (io) => {
     // ROOM MANAGEMENT EVENTS
     // ========================================
 
-    socket.on('joinInterview', ({ meetingId, user }) => {
+    socket.on('joinInterview', ({ meetingId, user, isCamOn, isMicOn }) => {
       if (!user || !user.id) {
         console.error('❌ Invalid user, missing id:', user);
         return;
@@ -32,38 +32,39 @@ export const setupSocketHandlers = (io) => {
       socket.meetingId = meetingId;
       socket.userData = user;
 
-      if (!interviewRooms[meetingId]) {
-        interviewRooms[meetingId] = [];
-      }
-
       const userWithSocket = {
         ...user,
         socketId: socket.id,
-        isCamOn: user.isCamOn || true, // Default to true if not provided
-        isMicOn: user.isMicOn || true,
+        isCamOn: isCamOn !== undefined ? isCamOn : true,
+        isMicOn: isMicOn !== undefined ? isMicOn : true,
       };
 
-      const oldEntry = interviewRooms[meetingId].find((u) => u.id === user.id);
-      if (oldEntry) {
-        console.log(`🔄 User ${user.name} reconnecting`);
+      if (!interviewRooms[meetingId]) {
+        interviewRooms[meetingId] = [];
+      } else {
+        // Remove stale connection for the SAME SOCKET ID if it somehow exists
+        interviewRooms[meetingId] = interviewRooms[meetingId].filter(
+          (u) => u.socketId !== socket.id
+        );
       }
 
-      interviewRooms[meetingId] = interviewRooms[meetingId].filter(
-        (u) => u.id !== user.id
-      );
       interviewRooms[meetingId].push(userWithSocket);
 
-      io.to(meetingId).emit('participantsUpdate', interviewRooms[meetingId]);
-
-      const existingParticipants = interviewRooms[meetingId].filter(
-        (u) => u.id !== user.id
+      console.log(
+        `👤 User ${user.name} joined room ${meetingId} (Cam: ${userWithSocket.isCamOn}, Mic: ${userWithSocket.isMicOn})`
       );
 
-      if (existingParticipants.length > 0) {
-        socket.emit('existingParticipants', existingParticipants);
-      }
+      // 1. Notify the new joiner about who is ALREADY there
+      const existingParticipants = interviewRooms[meetingId].filter(
+        (u) => u.socketId !== socket.id
+      );
+      socket.emit('existingParticipants', existingParticipants);
 
+      // 2. Notify OTHERS that someone new joined
       socket.to(meetingId).emit('newParticipant', userWithSocket);
+
+      // 3. Update room-wide participant list (for UI consistency)
+      io.to(meetingId).emit('participantsUpdate', interviewRooms[meetingId]);
     });
 
     socket.on('readyToConnect', ({ meetingId }) => {

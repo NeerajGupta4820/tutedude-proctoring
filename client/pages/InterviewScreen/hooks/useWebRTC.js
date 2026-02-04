@@ -267,13 +267,34 @@ export const useWebRTC = (socket, roomId, isConnected, localStream) => {
   );
 
   /**
+   * Updates participants list from server while preserving local stream objects.
+   */
+  const syncParticipantsFromServer = useCallback((serverParticipants) => {
+    setParticipants((prev) => {
+      return serverParticipants.map((serverP) => {
+        const existingP = prev.find((p) => p.socketId === serverP.socketId);
+        return {
+          ...serverP,
+          stream: existingP ? existingP.stream : null, // Preserve existing stream
+        };
+      });
+    });
+  }, []);
+
+  /**
    * Updates state when a participant turns their camera/mic on or off.
    */
   const processParticipantMediaStatus = useCallback(
     ({ socketId, isCamOn, isMicOn }) => {
       setParticipants((prev) =>
         prev.map((p) =>
-          p.socketId === socketId ? { ...p, isCamOn, isMicOn } : p
+          p.socketId === socketId
+            ? {
+                ...p,
+                isCamOn: isCamOn !== undefined ? isCamOn : p.isCamOn,
+                isMicOn: isMicOn !== undefined ? isMicOn : p.isMicOn,
+              }
+            : p
         )
       );
     },
@@ -350,6 +371,7 @@ export const useWebRTC = (socket, roomId, isConnected, localStream) => {
   return {
     participants,
     setParticipants,
+    syncParticipantsFromServer,
     createPeerConnection: initializeNewConnection, // Re-mapped to original name for compatibility
     cleanupPeerConnection: removePeerConnection,
     cleanupAllConnections: removeAllConnections,

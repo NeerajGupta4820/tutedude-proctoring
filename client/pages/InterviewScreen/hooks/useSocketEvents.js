@@ -28,9 +28,21 @@ export const useSocketEvents = (meetingId, user) => {
   // Logic Refs
   const initialSyncDoneRef = useRef(false);
 
+  // Store user info in ref to avoid re-triggering effect
+  const userRef = useRef(user);
+  userRef.current = user;
+
   useEffect(() => {
     // Basic validation: user and meeting ID must be present
-    if (!meetingId || !user?.id) return;
+    if (!meetingId || !userRef.current?.id) return;
+
+    // Prevent creating multiple sockets if one already exists
+    if (socketInstanceRef.current?.connected) {
+      console.log('⚠️ Socket already connected, skipping re-creation');
+      return;
+    }
+
+    console.log('🔌 Creating new socket connection for meeting:', meetingId);
 
     // Initialize the Socket connection
     const socket = io(SOCKET_URL, {
@@ -52,19 +64,13 @@ export const useSocketEvents = (meetingId, user) => {
       setIsSuccessfullyConnected(true);
       setIsCurrentlyReconnecting(false);
 
-      // Join the interview room and tell the server who we are
-      socket.emit('joinInterview', {
-        meetingId: meetingId,
-        user: { id: user.id, name: user.name, role: user.role },
-      });
-
-      // Request latest settings from the server (in case we re-joined)
+      // Request feature settings
       socket.emit('whiteboard-get-settings', { meetingId: meetingId });
       socket.emit('question-get-settings', { meetingId: meetingId });
       socket.emit('codeeditor-get-settings', { meetingId: meetingId });
 
       // If we are a candidate, ask for current question data
-      if (user?.role === 'candidate') {
+      if (userRef.current?.role === 'candidate') {
         socket.emit('question-request-data', { meetingId: meetingId });
       }
     });
@@ -80,6 +86,8 @@ export const useSocketEvents = (meetingId, user) => {
     });
 
     // --- Feature Specific Listeners ---
+    // Note: Signaling events (offer, answer, ice-candidate, newParticipant, etc.)
+    // are now handled directly in InterviewScreen.jsx
 
     // 1. Whiteboard Events
     socket.on('whiteboard-fullscreen', ({ isFullscreen }) =>
@@ -92,7 +100,7 @@ export const useSocketEvents = (meetingId, user) => {
     // 2. Question Panel Events
     socket.on('question-visibility', ({ isVisible }) => {
       setShowQuestionToCandidate(isVisible);
-      if (user?.role === 'candidate' && isVisible) {
+      if (userRef.current?.role === 'candidate' && isVisible) {
         socket.emit('question-request-data', { meetingId: meetingId });
       }
     });
@@ -123,7 +131,7 @@ export const useSocketEvents = (meetingId, user) => {
         cleared,
         notAvailable,
       }) => {
-        if (user?.role !== 'candidate') return;
+        if (userRef.current?.role !== 'candidate') return;
         if (cleared || notAvailable) {
           setMeetingQuestions([]);
           setActiveQuestionIndex(0);
@@ -150,16 +158,18 @@ export const useSocketEvents = (meetingId, user) => {
 
     // --- Cleanup ---
     return () => {
+      console.log('🔌 Cleaning up socket for meeting:', meetingId);
       if (socket) {
         // Tell server we are leaving
         socket.emit('leaveInterview', {
           meetingId: meetingId,
-          userId: user.id,
+          userId: userRef.current?.id,
         });
         socket.disconnect();
+        socketInstanceRef.current = null;
       }
     };
-  }, [meetingId, user]);
+  }, [meetingId]); // Only depend on meetingId, user is accessed via ref
 
   // Exposed items for the main InterviewScreen component
   return {
@@ -176,6 +186,6 @@ export const useSocketEvents = (meetingId, user) => {
     setQuestions: setMeetingQuestions,
     codeEditorFullscreen: isCodeEditorFullscreen,
     codeEditorVisibleToCandidate: showCodeEditorToCandidate,
-    questionsSyncedRef: initialSyncDoneRef, // Used to track if we need to send initial sync from admin
+    questionsSyncedRef: initialSyncDoneRef,
   };
 };
