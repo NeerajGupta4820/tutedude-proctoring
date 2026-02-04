@@ -16,6 +16,7 @@ const MainLayout = ({
     <div className="flex-1 flex flex-col">
       <Topbar
         activeTab={activeTab}
+        setActiveTab={setActiveTab}
         meetings={meetings}
         upcomingMeetings={upcomingMeetings}
         users={users}
