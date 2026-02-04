@@ -3,6 +3,7 @@ import React, { useState, useEffect, useContext, useRef, useCallback } from 'rea
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { AuthContext } from '../../components/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 
 // Components
 import InterviewHeader from '../../components/interview/InterviewHeader';
@@ -19,6 +20,7 @@ import { API_BASE_URL } from './constants';
 
 const InterviewScreen = () => {
   const { user } = useContext(AuthContext);
+  const { currentColors, loadPublicTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const navState = location.state || {};
@@ -272,28 +274,60 @@ const InterviewScreen = () => {
         try {
             let roomIdToUse = meetingId;
             let meeting = null;
-            if (meetingId.startsWith('meeting-')) {
+            
+            // First try: Direct fetch by ID or roomId
+            try {
+                const response = await axios.get(`${API_BASE_URL}/meeting/${meetingId}`, { headers });
+                meeting = response.data.data;
+                if(meeting?.roomId) roomIdToUse = meeting.roomId;
+            } catch(e) {
+                console.log('Direct meeting fetch failed, trying alternate methods...');
+            }
+            
+            // Second try (admin only): Search in all meetings by roomId
+            if (!meeting && isAdmin && meetingId.startsWith('meeting-')) {
                  try {
                      const response = await axios.get(`${API_BASE_URL}/meeting/`, { headers });
                      const meetings = response.data.data?.meetings || response.data.data || [];
                      meeting = meetings.find(m => m.roomId === meetingId);
-                 } catch(e) {}
-            } else {
-                 try {
-                    const response = await axios.get(`${API_BASE_URL}/meeting/${meetingId}`, { headers });
-                    meeting = response.data.data;
-                    if(meeting?.roomId) roomIdToUse = meeting.roomId;
-                 } catch(e) {}
+                 } catch(e) {
+                   console.log('All meetings fetch failed');
+                 }
+            }
+            
+            // Third try (candidate): Use next meeting endpoint
+            if (!meeting && isCandidate) {
+              try {
+                const response = await axios.get(`${API_BASE_URL}/meeting/next`, { headers });
+                meeting = response.data.data;
+                if(meeting?.roomId) roomIdToUse = meeting.roomId;
+              } catch(e) {
+                console.log('Next meeting fetch failed');
+              }
             }
             
             if(!meeting) meeting = { _id: roomIdToUse, roomId: roomIdToUse, interviewConfig: { jobRole: 'Technical Interview' } };
             
+            console.log('📋 Meeting data loaded:', meeting._id, 'Interviewer:', meeting.interviewer);
+            
             setActualRoomId(roomIdToUse);
             setMeetingData(meeting);
+            
+            // Load admin's theme for the interview room
+            // Try: interviewer (who created), createdBy, adminId
+            const adminId = meeting.interviewer?._id || meeting.interviewer || 
+                           meeting.createdBy?._id || meeting.createdBy || 
+                           meeting.adminId;
+            console.log('🎨 Loading theme for admin:', adminId, 'Meeting:', meeting._id);
+            if (adminId) {
+              loadPublicTheme(adminId);
+            }
+            
             if(isAdmin) await fetchCandidateData(meeting); 
             await fetchQuestions(meeting);
 
         } catch (error) {
+            console.error('Meeting fetch error:', error);
             setActualRoomId(meetingId);
             setMeetingData({ _id: meetingId, roomId: meetingId });
         }
@@ -333,7 +367,10 @@ const InterviewScreen = () => {
 
   // Render - MATCHING ORIGINAL STRUCTURE EXACTLY
   return (
-    <div className="h-screen bg-gray-200 font-sans flex flex-col overflow-hidden">
+    <div 
+      className="h-screen font-sans flex flex-col overflow-hidden"
+      style={{ backgroundColor: currentColors.background }}
+    >
       {/* HEADER */}
       <InterviewHeader
         meetingData={meetingData}

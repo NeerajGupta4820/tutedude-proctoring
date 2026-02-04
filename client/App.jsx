@@ -16,6 +16,7 @@ import MeetingSetup from './pages/MeetingSetup';
 import Signup from './pages/Signup';
 import EndMeeting from './pages/EndMeeting';
 import { AuthProvider, AuthContext } from './components/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import AdminEndMeeting from './pages/admin/AdminEndMeeting';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import ToastProvider from './components/providers/ToastProvider';
@@ -30,49 +31,52 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
 const App = () => (
   <ToastProvider>
     <AuthProvider>
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute adminOnly={true}>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/*"
-            element={
-              <ProtectedRoute>
-                <Routes>
-                  <Route path="/" element={<Home />} />
-                  <Route
-                    path="/system-check-error"
-                    element={<InterviewSystemCheckError />}
-                  />
-                  <Route path="/face-input" element={<InterviewFaceInput />} />
-                  <Route
-                    path="/confirm-face-input"
-                    element={<InterviewConfirmFaceInput />}
-                  />
-                  <Route path="/meetingsetup" element={<MeetingSetup />} />
-                  <Route path="/interview" element={<InterviewScreen />} />
-                  <Route path="/endmeeting" element={<EndMeeting />} />
-                  <Route path="/report" element={<ReportPage />} />
-                  <Route
-                    path="/admin-end-meeting/:id"
-                    element={<AdminEndMeeting />}
-                  />
-                </Routes>
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </Router>
+      <ThemeProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute adminOnly={true}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/*"
+              element={
+                <ProtectedRoute>
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route
+                      path="/system-check-error"
+                      element={<InterviewSystemCheckError />}
+                    />
+                    <Route path="/face-input" element={<InterviewFaceInput />} />
+                    <Route
+                      path="/confirm-face-input"
+                      element={<InterviewConfirmFaceInput />}
+                    />
+                    <Route path="/meetingsetup" element={<MeetingSetup />} />
+                    <Route path="/interview" element={<InterviewScreen />} />
+                    <Route path="/endmeeting" element={<EndMeeting />} />
+                    <Route path="/report" element={<ReportPage />} />
+                    <Route
+                      path="/admin-end-meeting/:id"
+                      element={<AdminEndMeeting />}
+                    />
+                  </Routes>
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+        </Router>
+      </ThemeProvider>
     </AuthProvider>
   </ToastProvider>
 );
 
 export default App;
+

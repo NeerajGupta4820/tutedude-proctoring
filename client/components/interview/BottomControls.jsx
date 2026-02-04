@@ -7,8 +7,9 @@ import {
   FaVideo,
   FaVideoSlash,
   FaSignOutAlt,
-  FaSync,
 } from 'react-icons/fa';
+import { HiOutlineRefresh } from 'react-icons/hi';
+import { useTheme } from '../../context/ThemeContext';
 
 const BottomControls = ({
   micOn,
@@ -23,81 +24,106 @@ const BottomControls = ({
   onReconnect,
   onLeave,
 }) => {
+  const { currentColors } = useTheme();
+
+  const ControlButton = ({ onClick, active, danger, children, title, badge, disabled }) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className="relative p-4 rounded-2xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95"
+      style={{
+        background: active 
+          ? `linear-gradient(135deg, ${currentColors.primary}, ${currentColors.secondary})`
+          : danger 
+            ? 'linear-gradient(135deg, #ef4444, #f43f5e)'
+            : currentColors.surface,
+        color: active || danger ? '#ffffff' : currentColors.textMuted,
+        boxShadow: active ? `0 10px 30px ${currentColors.primary}40` : undefined,
+        opacity: disabled ? 0.5 : 1,
+        cursor: disabled ? 'not-allowed' : 'pointer'
+      }}
+    >
+      {children}
+      {badge && (
+        <span 
+          className="absolute -top-1 -right-1 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold shadow-lg"
+          style={{ background: `linear-gradient(135deg, ${currentColors.primary}, ${currentColors.secondary})` }}
+        >
+          {badge}
+        </span>
+      )}
+    </button>
+  );
+
   return (
-    <div className="bg-white border-t border-gray-300 shadow-lg flex-shrink-0">
-      <div className="flex items-center justify-center gap-3 px-6 py-2">
+    <div 
+      className="border-t shadow-2xl flex-shrink-0"
+      style={{ 
+        background: `linear-gradient(to right, ${currentColors.background}, ${currentColors.surface}, ${currentColors.background})`,
+        borderColor: `${currentColors.primary}30`
+      }}
+    >
+      <div className="flex items-center justify-center gap-4 px-6 py-4">
         {/* Mic Toggle */}
-        <button
+        <ControlButton
           onClick={onToggleMic}
-          className={`p-4 rounded-lg font-semibold transition-all shadow-md hover:scale-105 ${
-            micOn
-              ? 'bg-cyan-700 text-white hover:bg-cyan-800'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
+          active={micOn}
           title={micOn ? 'Mute Mic' : 'Unmute Mic'}
         >
           {micOn ? <FaMicrophone size={20} /> : <FaMicrophoneSlash size={20} />}
-        </button>
+        </ControlButton>
 
         {/* Camera Toggle */}
-        <button
+        <ControlButton
           onClick={onToggleCamera}
-          className={`p-4 rounded-lg font-semibold transition-all shadow-md hover:scale-105 ${
-            camOn
-              ? 'bg-cyan-700 text-white hover:bg-cyan-800'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
+          active={camOn}
           title={camOn ? 'Turn Off Camera' : 'Turn On Camera'}
         >
           {camOn ? <FaVideo size={20} /> : <FaVideoSlash size={20} />}
-        </button>
+        </ControlButton>
+
+        {/* Divider */}
+        <div className="h-10 w-px" style={{ backgroundColor: currentColors.textMuted + '40' }}></div>
 
         {/* Layout Toggle */}
-        <button
-          onClick={onToggleLayout}
-          className="p-4 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all shadow-md hover:scale-105"
-          title="Switch Layout"
-        >
+        <ControlButton onClick={onToggleLayout} title="Switch Layout">
           <FaThLarge size={20} />
-        </button>
+        </ControlButton>
 
         {/* Participants Toggle */}
-        <button
+        <ControlButton
           onClick={onToggleParticipants}
-          className="p-4 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 transition-all shadow-md hover:scale-105 relative"
           title="Show Participants"
+          badge={participantsCount > 0 ? participantsCount : null}
         >
           <FaUserFriends size={20} />
-          {participantsCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-cyan-700 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
-              {participantsCount}
-            </span>
-          )}
-        </button>
+        </ControlButton>
 
         {/* Reconnect Button */}
-        <button
+        <ControlButton
           onClick={onReconnect}
           disabled={isReconnecting}
-          className={`p-4 rounded-lg transition-all shadow-md hover:scale-105 ${
-            isReconnecting
-              ? 'bg-yellow-500 text-white cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-          }`}
           title="Reconnect"
+          active={isReconnecting}
         >
-          <FaSync size={20} className={isReconnecting ? 'animate-spin' : ''} />
-        </button>
+          <HiOutlineRefresh size={20} className={isReconnecting ? 'animate-spin' : ''} />
+        </ControlButton>
 
-        <div className="h-8 w-px bg-gray-300 mx-2"></div>
+        {/* Divider */}
+        <div className="h-10 w-px" style={{ backgroundColor: currentColors.textMuted + '40' }}></div>
 
         {/* Leave Button */}
         <button
           onClick={onLeave}
-          className="px-6 py-4 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all shadow-md hover:scale-105 flex items-center gap-2"
+          className="px-6 py-3 rounded-2xl font-semibold transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2 text-white"
+          style={{ 
+            background: 'linear-gradient(135deg, #ef4444, #f43f5e)',
+            boxShadow: '0 10px 30px rgba(239, 68, 68, 0.3)'
+          }}
           title="Leave Interview"
         >
-          <FaSignOutAlt size={20} />
+          <FaSignOutAlt size={18} />
           <span>Leave</span>
         </button>
       </div>

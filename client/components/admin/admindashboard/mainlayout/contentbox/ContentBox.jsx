@@ -12,6 +12,7 @@ import CreateCandidate from './CandidateManager/CreateCandidate';
 import UpdateCandidate from './CandidateManager/UpdateCandidate';
 import CandidateProfile from './CandidateManager/CandidateProfile';
 import InterviewerManagement from './InterviewerManagement';
+import SettingsPanel from '../../SettingsPanel';
 
 const ContentBox = ({
   activeTab,
@@ -172,8 +173,14 @@ const ContentBox = ({
       {activeTab === 'interviewers' && (
         <InterviewerManagement onUpdate={onUpdate} />
       )}
+
+      {/* Settings */}
+      {activeTab === 'settings' && (
+        <SettingsPanel />
+      )}
     </div>
   );
 };
 
 export default ContentBox;
+

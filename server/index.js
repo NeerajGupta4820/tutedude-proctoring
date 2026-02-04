@@ -16,6 +16,7 @@ import questionRoutes from './routes/questionRoutes.js';
 import codeRoutes from './routes/codeRoutes.js';
 import interviewResultRoutes from './routes/interviewResultRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import themeRoutes from './routes/themeRoutes.js';
 import connectDB from './db/dbconfig.js';
 
 dotenv.config();
@@ -48,6 +49,7 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/report', reportRoutes);
 app.use('/api/code', codeRoutes);
 app.use('/api/interview-results', interviewResultRoutes);
+app.use('/api/theme', themeRoutes);
 
 // Error handler
 app.use((err, req, res, next) => {

@@ -12,6 +12,7 @@ import {
   FaPlus,
   FaList,
   FaUserPlus,
+  FaCog,
 } from 'react-icons/fa';
 import { AuthContext } from '../../AuthContext';
 
@@ -26,7 +27,7 @@ const Sidebar = ({
   candidates,
 }) => {
   const { user, logout } = useContext(AuthContext);
-  const [hoveredItem, setHoveredItem] = useState(null);
+  const [hoveredItem] = useState(null);
 
   const menuItems = [
     {
@@ -65,6 +66,12 @@ const Sidebar = ({
         { id: 'candidates', label: 'All Candidates', icon: FaList },
         { id: 'create-candidate', label: 'Add Candidate', icon: FaUserPlus },
       ],
+    },
+    {
+      id: 'settings',
+      label: 'Settings',
+      icon: FaCog,
+      type: 'single',
     },
   ];
 
