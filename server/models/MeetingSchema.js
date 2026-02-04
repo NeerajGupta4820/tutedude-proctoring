@@ -129,6 +129,28 @@ const meetingSchema = new mongoose.Schema(
       default: 'pending',
     },
 
+    // Cheating Detection
+    cheatingDetected: {
+      type: Boolean,
+      default: false,
+    },
+    cheatingDetails: String,
+
+    // Fail Reason
+    failReason: {
+      type: String,
+      enum: [
+        'insufficient',
+        'cheating',
+        'no_show',
+        'poor_communication',
+        'unprofessional',
+        'other',
+        '',
+      ],
+      default: '',
+    },
+
     // New Evaluation
     evaluation: {
       overallRating: {
