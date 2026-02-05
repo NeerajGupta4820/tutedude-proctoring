@@ -12,6 +12,57 @@ const CLOUDINARY_FOLDERS = {
   resume: 'tutedude/resume',
 };
 
+// Start: New helper for single file upload
+export const uploadFile = async (req, res, next) => {
+  try {
+    const isPhoto = !!req.files?.photo?.[0];
+    const isResume = !!req.files?.resume?.[0];
+
+    if (!isPhoto && !isResume) {
+      return next(new ApiError(400, 'No file uploaded'));
+    }
+
+    let result;
+    if (isPhoto) {
+      result = await uploadToCloudinary(
+        req.files.photo[0].buffer,
+        CLOUDINARY_FOLDERS.photo,
+        'image'
+      );
+    } else {
+      result = await uploadToCloudinary(
+        req.files.resume[0].buffer,
+        CLOUDINARY_FOLDERS.resume,
+        'raw'
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        url: result.url,
+        publicId: result.publicId,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteFile = async (req, res, next) => {
+  try {
+    const { publicId, resourceType } = req.body;
+    if (!publicId) return next(new ApiError(400, 'Public ID required'));
+
+    await deleteFromCloudinary(publicId, resourceType || 'image');
+
+    res.status(200).json({ success: true, message: 'File deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
+// End: New helper
+
 // Create candidate
 export const createCandidate = async (req, res, next) => {
   try {
@@ -52,12 +103,12 @@ export const createCandidate = async (req, res, next) => {
       );
     }
 
-    // Parallel upload to Cloudinary
+    // Parallel upload to Cloudinary (or use pre-uploaded)
     let photoResult = null;
     let resumeResult = null;
     const uploadPromises = [];
 
-    // Photo upload
+    // Photo: Check file first, then body (pre-uploaded)
     if (req.files?.photo?.[0]?.buffer) {
       console.log('📸 Uploading photo to Cloudinary...');
       uploadPromises.push(
@@ -74,9 +125,15 @@ export const createCandidate = async (req, res, next) => {
             console.error('❌ Photo upload failed:', err.message);
           })
       );
+    } else if (req.body.photoUrl && req.body.photoPublicId) {
+      console.log('📸 Using pre-uploaded photo:', req.body.photoUrl);
+      photoResult = {
+        url: req.body.photoUrl,
+        publicId: req.body.photoPublicId,
+      };
     }
 
-    // Resume upload
+    // Resume: Check file first, then body (pre-uploaded)
     if (req.files?.resume?.[0]?.buffer) {
       console.log('📄 Uploading resume to Cloudinary...');
       uploadPromises.push(
@@ -93,6 +150,12 @@ export const createCandidate = async (req, res, next) => {
             console.error('❌ Resume upload failed:', err.message);
           })
       );
+    } else if (req.body.resumeUrl && req.body.resumePublicId) {
+      console.log('📄 Using pre-uploaded resume:', req.body.resumeUrl);
+      resumeResult = {
+        url: req.body.resumeUrl,
+        publicId: req.body.resumePublicId,
+      };
     }
 
     // Wait for all uploads

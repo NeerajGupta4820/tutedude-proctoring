@@ -11,6 +11,7 @@ import CandidateManagement from './CandidateManager/CandidateManagement';
 import CreateCandidate from './CandidateManager/CreateCandidate';
 import UpdateCandidate from './CandidateManager/UpdateCandidate';
 import CandidateProfile from './CandidateManager/CandidateProfile';
+import CandidateResults from './CandidateManager/CandidateResults';
 import InterviewerManagement from './InterviewerManagement';
 import SettingsPanel from '../../SettingsPanel';
 
@@ -61,6 +62,11 @@ const ContentBox = ({
     setEditingCandidate(viewingCandidate);
     setViewingCandidate(null);
     setActiveTab('edit-candidate');
+  };
+
+  const handleViewResultsFromProfile = () => {
+    setViewingCandidate(null);
+    setActiveTab('results');
   };
 
   return (
@@ -166,6 +172,16 @@ const ContentBox = ({
           onBack={handleCandidateViewClose}
           onEdit={handleCandidateEditFromView}
           onUpdate={onUpdate}
+          onViewResults={handleViewResultsFromProfile}
+        />
+      )}
+
+      {/* Candidate Results */}
+      {activeTab === 'results' && (
+        <CandidateResults
+          candidates={candidates}
+          meetings={meetings}
+          onViewCandidate={handleViewCandidate}
         />
       )}
 

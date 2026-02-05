@@ -15,6 +15,7 @@ import {
   FaCog,
   FaChevronRight,
   FaChevronDown,
+  FaChartLine,
 } from 'react-icons/fa';
 import { HiSparkles, HiLightningBolt } from 'react-icons/hi';
 import { AuthContext } from '../../AuthContext';
@@ -76,6 +77,7 @@ const Sidebar = ({
       children: [
         { id: 'candidates', label: 'All Candidates', icon: FaList, count: candidates.length },
         { id: 'create-candidate', label: 'Add Candidate', icon: FaUserPlus, highlight: true },
+        { id: 'results', label: 'Results', icon: FaChartLine },
       ],
     },
     {

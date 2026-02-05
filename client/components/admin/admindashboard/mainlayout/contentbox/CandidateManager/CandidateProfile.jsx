@@ -15,11 +15,12 @@ import {
   FaUser,
   FaEye,
   FaFilePdf,
+  FaChartLine,
 } from 'react-icons/fa';
 import ImagePreviewModal from '../../../../../dialogs/ImagePreviewModal';
 import ResumePreviewModal from '../../../../../dialogs/ResumePreviewModal';
 
-const CandidateProfile = ({ candidate, onBack, onEdit, onDelete }) => {
+const CandidateProfile = ({ candidate, onBack, onEdit, onDelete, onViewResults }) => {
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [showResumePreview, setShowResumePreview] = useState(false);
 
@@ -123,6 +124,15 @@ const CandidateProfile = ({ candidate, onBack, onEdit, onDelete }) => {
             </div>
           </div>
           <div className="flex gap-2">
+            {onViewResults && (
+              <button
+                onClick={onViewResults}
+                className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                <FaChartLine size={12} />
+                <span>View Results</span>
+              </button>
+            )}
             <button
               onClick={onEdit}
               className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium transition-colors"

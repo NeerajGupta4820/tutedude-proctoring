@@ -13,6 +13,8 @@ import {
   updatePassword,
   approveCandidate,
   rejectCandidate,
+  uploadFile,
+  deleteFile,
 } from '../controllers/candidateController.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -89,6 +91,8 @@ const uploadFields = upload.fields([
 ]);
 
 // Routes
+router.post('/upload', uploadFields, handleMulterError, uploadFile);
+router.post('/delete-file', deleteFile);
 router.post('/create', uploadFields, handleMulterError, createCandidate);
 router.get('/all', getAllCandidates);
 router.get('/:id', getCandidateById);

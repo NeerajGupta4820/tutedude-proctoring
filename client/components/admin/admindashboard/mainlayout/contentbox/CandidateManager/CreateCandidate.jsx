@@ -68,6 +68,14 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
     photo: null,
     resume: null,
   });
+  const [uploadedFiles, setUploadedFiles] = useState({
+    photo: null,
+    resume: null,
+  });
+  const [uploading, setUploading] = useState({
+    photo: false,
+    resume: false,
+  });
   const [preview, setPreview] = useState({
     photo: null,
   });
@@ -95,29 +103,63 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
     }));
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const { name, files: fileList } = e.target;
 
     if (fileList && fileList[0]) {
+      const file = fileList[0];
+      
+      // Set local file state (for display name/size)
       setFiles((prev) => ({
         ...prev,
-        [name]: fileList[0],
+        [name]: file,
       }));
 
-      if (name === 'photo') {
-        const reader = new FileReader();
-        reader.onloadend = () => {
+      // Start upload
+      setUploading((prev) => ({ ...prev, [name]: true }));
+      setError('');
+
+      const uploadData = new FormData();
+      uploadData.append(name, file);
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.post(
+          `${API_URL}/candidate/upload`,
+          uploadData,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+
+        const { url, publicId } = response.data.data;
+
+        setUploadedFiles((prev) => ({
+          ...prev,
+          [name]: { url, publicId },
+        }));
+
+        if (name === 'photo') {
           setPreview((prev) => ({
             ...prev,
-            photo: reader.result,
+            photo: url,
           }));
-        };
-        reader.readAsDataURL(fileList[0]);
+        }
+      } catch (err) {
+        console.error(`Error uploading ${name}:`, err);
+        setError(`Failed to upload ${name}. Please try again.`);
+        // Reset file input if upload failed
+        setFiles((prev) => ({ ...prev, [name]: null }));
+      } finally {
+        setUploading((prev) => ({ ...prev, [name]: false }));
       }
     }
   };
 
-  const resetForm = () => {
+  const cleanReset = () => {
     setFormData({
       name: '',
       email: '',
@@ -128,6 +170,10 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
       notes: '',
       password: '',
     });
+    setUploadedFiles({
+      photo: null,
+      resume: null,
+    });
     setFiles({
       photo: null,
       resume: null,
@@ -137,12 +183,29 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
     });
     setError('');
     setSuccess('');
+    setUploading({
+      photo: false,
+      resume: false,
+    });
+  };
+
+  const handleReset = async () => {
+    if (uploadedFiles.photo) await deleteFile(uploadedFiles.photo, 'photo');
+    if (uploadedFiles.resume) await deleteFile(uploadedFiles.resume, 'resume');
+    cleanReset();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+
+    // Check if file uploads are still in progress
+    if (uploading.photo || uploading.resume) {
+      setError('Please wait for file uploads to complete before creating the candidate.');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -162,10 +225,17 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
       formDataToSend.append('notes', formData.notes);
       formDataToSend.append('password', formData.password);
 
-      if (files.photo) {
+      if (uploadedFiles.photo) {
+        formDataToSend.append('photoUrl', uploadedFiles.photo.url);
+        formDataToSend.append('photoPublicId', uploadedFiles.photo.publicId);
+      } else if (files.photo) {
         formDataToSend.append('photo', files.photo);
       }
-      if (files.resume) {
+
+      if (uploadedFiles.resume) {
+        formDataToSend.append('resumeUrl', uploadedFiles.resume.url);
+        formDataToSend.append('resumePublicId', uploadedFiles.resume.publicId);
+      } else if (files.resume) {
         formDataToSend.append('resume', files.resume);
       }
 
@@ -177,7 +247,7 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
       });
 
       setSuccess('Candidate created successfully!');
-      resetForm();
+      cleanReset();
       if (onCandidateCreated) onCandidateCreated();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
@@ -199,13 +269,47 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
     }));
   };
 
-  const removePhoto = () => {
+  const deleteFile = async (data, type) => {
+    if (!data?.publicId) return;
+    try {
+      const token = localStorage.getItem('token');
+      await axios.post(
+        `${API_URL}/candidate/delete-file`,
+        {
+          publicId: data.publicId,
+          resourceType: type === 'photo' ? 'image' : 'raw',
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+    } catch (err) {
+      console.error('Error deleting file:', err);
+    }
+  };
+
+  const removePhoto = async () => {
+    if (uploadedFiles.photo) {
+      await deleteFile(uploadedFiles.photo, 'photo');
+      setUploadedFiles((prev) => ({ ...prev, photo: null }));
+    }
     setFiles((prev) => ({ ...prev, photo: null }));
     setPreview((prev) => ({ ...prev, photo: null }));
   };
 
-  const removeResume = () => {
+  const removeResume = async () => {
+    if (uploadedFiles.resume) {
+      await deleteFile(uploadedFiles.resume, 'resume');
+      setUploadedFiles((prev) => ({ ...prev, resume: null }));
+    }
     setFiles((prev) => ({ ...prev, resume: null }));
+  };
+
+  // Safe cancel: check if uploaded files need to be cleaned up
+  const handleCancel = async () => {
+    if (uploadedFiles.photo) await deleteFile(uploadedFiles.photo, 'photo');
+    if (uploadedFiles.resume) await deleteFile(uploadedFiles.resume, 'resume');
+    if (onCancel) onCancel();
   };
 
   return (
@@ -224,7 +328,7 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
           {onCancel && (
             <button
               type="button"
-              onClick={onCancel}
+              onClick={handleCancel}
               className="flex items-center gap-2 px-4 py-2.5 text-gray-600 bg-white border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg text-sm font-medium transition-all"
             >
               <FaArrowLeft size={12} />
@@ -560,6 +664,11 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
                               <p className="text-xs text-gray-500 mt-1">
                                 PNG, JPG up to 5MB
                               </p>
+                              {uploading.photo && (
+                                <div className="mt-2 text-xs text-blue-600 font-medium animate-pulse">
+                                  Uploading...
+                                </div>
+                              )}
                             </label>
                           </div>
                         )}
@@ -634,6 +743,11 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
                               <p className="text-xs text-gray-500 mt-1">
                                 PDF, DOC, DOCX up to 10MB
                               </p>
+                              {uploading.resume && (
+                                <div className="mt-2 text-xs text-indigo-600 font-medium animate-pulse">
+                                  Uploading...
+                                </div>
+                              )}
                             </label>
                           </div>
                         )}
@@ -684,7 +798,7 @@ const CreateCandidate = ({ onCandidateCreated, onCancel }) => {
                   <div className="flex gap-3">
                     <button
                       type="button"
-                      onClick={resetForm}
+                      onClick={handleReset}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 text-gray-600 hover:text-gray-800 bg-gray-50 border-2 border-dashed border-gray-300 hover:border-gray-400 hover:bg-white rounded-xl text-sm font-medium transition-all"
                     >
                       <div className="w-6 h-6 rounded-md flex items-center justify-center border border-dashed border-gray-300">
