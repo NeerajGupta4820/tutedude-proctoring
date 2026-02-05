@@ -62,11 +62,11 @@ const sortMeetings = (meetings, sortBy) => {
       );
     case 'name-asc':
       return sorted.sort((a, b) =>
-        (a.user?.name || '').localeCompare(b.user?.name || '')
+        (a.candidate?.name || '').localeCompare(b.candidate?.name || '')
       );
     case 'name-desc':
       return sorted.sort((a, b) =>
-        (b.user?.name || '').localeCompare(a.user?.name || '')
+        (b.candidate?.name || '').localeCompare(a.candidate?.name || '')
       );
     case 'time-asc':
       return sorted.sort((a, b) =>
@@ -87,8 +87,8 @@ const filterMeetings = (meetings, searchQuery) => {
   if (!query) return meetings;
 
   return meetings.filter((m) => {
-    const userName = m.user?.name?.toLowerCase() || '';
-    const userEmail = m.user?.email?.toLowerCase() || '';
+    const candidateName = m.candidate?.name?.toLowerCase() || '';
+    const candidateEmail = m.candidate?.email?.toLowerCase() || '';
     const jobRole = (
       m.interviewConfig?.jobRole ||
       m.jobRole ||
@@ -98,8 +98,8 @@ const filterMeetings = (meetings, searchQuery) => {
     const category = (m.interviewConfig?.category || '').toLowerCase();
 
     return (
-      userName.includes(query) ||
-      userEmail.includes(query) ||
+      candidateName.includes(query) ||
+      candidateEmail.includes(query) ||
       jobRole.includes(query) ||
       round.includes(query) ||
       category.includes(query)
