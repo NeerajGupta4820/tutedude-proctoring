@@ -65,7 +65,11 @@ const AdminDashboard = () => {
   }
 
   const upcomingMeetings = meetings.filter(
-    (m) => new Date(m.scheduledDate || m.date) >= new Date()
+    (m) =>
+      new Date(m.scheduledDate || m.date) >= new Date() &&
+      m.status !== 'completed' &&
+      m.status !== 'cancelled' &&
+      !m.attended
   );
 
   return (

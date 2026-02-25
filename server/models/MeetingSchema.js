@@ -115,62 +115,8 @@ const meetingSchema = new mongoose.Schema(
     },
     actualStartTime: Date,
     actualEndTime: Date,
-
-    // Evaluation (Old fields for backward compatibility)
-    rating: {
-      type: Number,
-      min: 0,
-      max: 10,
-    },
-    review: String,
-    result: {
-      type: String,
-      enum: ['pass', 'fail', 'pending'],
-      default: 'pending',
-    },
-
-    // Cheating Detection
-    cheatingDetected: {
-      type: Boolean,
-      default: false,
-    },
-    cheatingDetails: String,
-
-    // Fail Reason
-    failReason: {
-      type: String,
-      enum: [
-        'insufficient',
-        'cheating',
-        'no_show',
-        'poor_communication',
-        'unprofessional',
-        'other',
-        '',
-      ],
-      default: '',
-    },
-
-    // New Evaluation
-    evaluation: {
-      overallRating: {
-        type: Number,
-        min: 0,
-        max: 10,
-      },
-      technicalScore: Number,
-      communicationScore: Number,
-      problemSolvingScore: Number,
-      result: {
-        type: String,
-        enum: ['selected', 'rejected', 'on-hold', 'pending'],
-        default: 'pending',
-      },
-      feedback: String,
-      strengths: [String],
-      improvements: [String],
-    },
-
+    // NOTE: All evaluation data is now stored in InterviewAnalysis schema
+    // This keeps Meeting schema focused on scheduling only
     notes: String,
 
     // Activity Logs
@@ -187,6 +133,6 @@ const meetingSchema = new mongoose.Schema(
 
 meetingSchema.index({ candidate: 1, scheduledDate: 1 });
 meetingSchema.index({ status: 1 });
-meetingSchema.index({ roomId: 1 });
+// Note: roomId index is automatically created by unique:true
 
 export default mongoose.model('Meeting', meetingSchema);

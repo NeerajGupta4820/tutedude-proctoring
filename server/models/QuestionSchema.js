@@ -31,26 +31,57 @@ const questionSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
-        'Array', 'String', 'Hash Table', 'Dynamic Programming',
-        'Math', 'Sorting', 'Greedy', 'Depth-First Search',
-        'Binary Search', 'Database', 'Breadth-First Search',
-        'Tree', 'Matrix', 'Two Pointers', 'Binary Tree',
-        'Bit Manipulation', 'Stack', 'Design', 'Heap (Priority Queue)',
-        'Graph', 'Simulation', 'Counting', 'Backtracking',
-        'Sliding Window', 'Union Find', 'Linked List',
-        'Ordered Set', 'Monotonic Stack', 'Enumeration',
-        'Recursion', 'Divide and Conquer', 'Queue',
-        'Trie', 'Segment Tree', 'Binary Search Tree',
-        'Bitmask', 'Topological Sort', 'Game Theory'
+        'Array',
+        'String',
+        'Hash Table',
+        'Dynamic Programming',
+        'Math',
+        'Sorting',
+        'Greedy',
+        'Depth-First Search',
+        'Binary Search',
+        'Database',
+        'Breadth-First Search',
+        'Tree',
+        'Matrix',
+        'Two Pointers',
+        'Binary Tree',
+        'Bit Manipulation',
+        'Stack',
+        'Design',
+        'Heap (Priority Queue)',
+        'Graph',
+        'Simulation',
+        'Counting',
+        'Backtracking',
+        'Sliding Window',
+        'Union Find',
+        'Linked List',
+        'Ordered Set',
+        'Monotonic Stack',
+        'Enumeration',
+        'Recursion',
+        'Divide and Conquer',
+        'Queue',
+        'Trie',
+        'Segment Tree',
+        'Binary Search Tree',
+        'Bitmask',
+        'Topological Sort',
+        'Game Theory',
       ],
     },
-    tags: [{
-      type: String,
-    }],
-    companies: [{
-      name: String,
-      frequency: { type: Number, min: 0, max: 10 },
-    }],
+    tags: [
+      {
+        type: String,
+      },
+    ],
+    companies: [
+      {
+        name: String,
+        frequency: { type: Number, min: 0, max: 10 },
+      },
+    ],
     problemStatement: {
       type: String,
       required: true,
@@ -63,46 +94,63 @@ const questionSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    constraints: [{
-      type: String,
-      required: true,
-    }],
-    examples: [{
-      input: {
+    constraints: [
+      {
         type: String,
         required: true,
       },
-      output: {
+    ],
+    examples: [
+      {
+        input: {
+          type: String,
+          required: true,
+        },
+        output: {
+          type: String,
+          required: true,
+        },
+        explanation: String,
+        image: String,
+      },
+    ],
+    testCases: [
+      {
+        input: {
+          type: String,
+          required: true,
+        },
+        expectedOutput: {
+          type: String,
+          required: true,
+        },
+        isHidden: {
+          type: Boolean,
+          default: false,
+        },
+        isSample: {
+          type: Boolean,
+          default: false,
+        },
+        explanation: String,
+      },
+    ],
+    supportedLanguages: [
+      {
         type: String,
-        required: true,
+        enum: [
+          'javascript',
+          'python',
+          'java',
+          'cpp',
+          'c',
+          'csharp',
+          'go',
+          'rust',
+        ],
+        default: ['javascript', 'python', 'java', 'cpp'],
       },
-      explanation: String,
-      image: String,
-    }],
-    testCases: [{
-      input: {
-        type: String,
-        required: true,
-      },
-      expectedOutput: {
-        type: String,
-        required: true,
-      },
-      isHidden: {
-        type: Boolean,
-        default: false,
-      },
-      isSample: {
-        type: Boolean,
-        default: false,
-      },
-      explanation: String,
-    }],
-    supportedLanguages: [{
-      type: String,
-      enum: ['javascript', 'python', 'java', 'cpp', 'c', 'csharp', 'go', 'rust'],
-      default: ['javascript', 'python', 'java', 'cpp'],
-    }],
+    ],
     starterCode: {
       javascript: {
         code: String,
@@ -144,15 +192,19 @@ const questionSchema = new mongoose.Schema(
       },
       explanation: String,
     },
-    hints: [{
-      level: { type: Number, required: true }, 
-      text: { type: String, required: true },
-    }],
+    hints: [
+      {
+        level: { type: Number, required: true },
+        text: { type: String, required: true },
+      },
+    ],
     followUp: [String],
-    similarQuestions: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Question',
-    }],
+    similarQuestions: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Question',
+      },
+    ],
     acceptanceRate: {
       type: Number,
       min: 0,
@@ -188,22 +240,20 @@ const questionSchema = new mongoose.Schema(
       ref: 'User',
     },
   },
-  { 
+  {
     timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
-// Indexes
+// Indexes (questionNumber and slug indexes are created by unique:true)
 questionSchema.index({ difficulty: 1, category: 1 });
 questionSchema.index({ tags: 1 });
 questionSchema.index({ isActive: 1 });
-questionSchema.index({ questionNumber: 1 });
-questionSchema.index({ slug: 1 });
 
 // Auto-generate slug from title
-questionSchema.pre('save', function(next) {
+questionSchema.pre('save', function (next) {
   if (this.isModified('title')) {
     this.slug = this.title
       .toLowerCase()
@@ -214,18 +264,22 @@ questionSchema.pre('save', function(next) {
 });
 
 // Auto-increment question number
-questionSchema.pre('save', async function(next) {
+questionSchema.pre('save', async function (next) {
   if (this.isNew && !this.questionNumber) {
-    const lastQuestion = await this.constructor.findOne().sort('-questionNumber');
+    const lastQuestion = await this.constructor
+      .findOne()
+      .sort('-questionNumber');
     this.questionNumber = lastQuestion ? lastQuestion.questionNumber + 1 : 1;
   }
   next();
 });
 
 // Calculate acceptance rate
-questionSchema.methods.updateAcceptanceRate = function() {
+questionSchema.methods.updateAcceptanceRate = function () {
   if (this.totalSubmissions > 0) {
-    this.acceptanceRate = Math.round((this.totalAccepted / this.totalSubmissions) * 100);
+    this.acceptanceRate = Math.round(
+      (this.totalAccepted / this.totalSubmissions) * 100
+    );
   }
 };
 

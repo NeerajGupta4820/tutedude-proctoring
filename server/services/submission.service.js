@@ -1,5 +1,5 @@
 import Submission from '../models/SubmissionSchema.js';
-import InterviewResult from '../models/InterviewResultSchema.js';
+import InterviewAnalysis from '../models/InterviewAnalysisSchema.js';
 import Question from '../models/QuestionSchema.js';
 import { ApiError } from '../utils/response.js';
 
@@ -80,7 +80,7 @@ class SubmissionService {
 
       // For submit type, update interview result
       if (submissionType === 'submit') {
-        await this.updateInterviewResult({
+        await this.updateInterviewAnalysis({
           meetingId,
           candidateId,
           questionId,
@@ -112,7 +112,7 @@ class SubmissionService {
     }
   }
 
-  async updateInterviewResult({
+  async updateInterviewAnalysis({
     meetingId,
     candidateId,
     questionId,
@@ -121,12 +121,12 @@ class SubmissionService {
   }) {
     try {
       // Get or create interview result
-      let interviewResult = await InterviewResult.findOne({
+      let interviewAnalysis = await InterviewAnalysis.findOne({
         meeting: meetingId,
       });
 
-      if (!interviewResult) {
-        interviewResult = await InterviewResult.create({
+      if (!interviewAnalysis) {
+        interviewAnalysis = await InterviewAnalysis.create({
           meeting: meetingId,
           candidate: candidateId,
         });
@@ -145,7 +145,7 @@ class SubmissionService {
       }
 
       // Update question result
-      await InterviewResult.updateQuestionResult(meetingId, questionId, {
+      await InterviewAnalysis.updateQuestionResult(meetingId, questionId, {
         questionNumber: question.questionNumber,
         title: question.title,
         difficulty: question.difficulty,
@@ -206,7 +206,6 @@ class SubmissionService {
 
     return submission;
   }
-
 
   async addInterviewerFeedback(submissionId, feedback, reviewerId) {
     const submission = await Submission.findById(submissionId);

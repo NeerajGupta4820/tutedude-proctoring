@@ -18,6 +18,10 @@ const interviewResultSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    attended: {
+      type: Boolean,
+      default: true,
+    },
 
     // Question-wise Results
     questionResults: [
@@ -283,8 +287,7 @@ const interviewResultSchema = new mongoose.Schema(
   }
 );
 
-// Indexes
-interviewResultSchema.index({ meeting: 1 });
+// Indexes (meeting index is created automatically by unique:true)
 interviewResultSchema.index({ candidate: 1 });
 interviewResultSchema.index({ result: 1 });
 interviewResultSchema.index({ 'codingScore.percentage': -1 });
@@ -431,4 +434,4 @@ interviewResultSchema.statics.updateQuestionResult = async function (
   return result;
 };
 
-export default mongoose.model('InterviewResult', interviewResultSchema);
+export default mongoose.model('InterviewAnalysis', interviewResultSchema);

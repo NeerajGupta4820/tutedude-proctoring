@@ -1,24 +1,38 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/response.js';
 import { ApiError } from '../utils/response.js';
-import InterviewResult from '../models/InterviewResultSchema.js';
+import InterviewAnalysis from '../models/InterviewAnalysisSchema.js';
 import Submission from '../models/SubmissionSchema.js';
 import Meeting from '../models/MeetingSchema.js';
+import mongoose from 'mongoose';
 
-export const getInterviewResult = asyncHandler(async (req, res) => {
+export const getInterviewAnalysis = asyncHandler(async (req, res) => {
   const { meetingId } = req.params;
 
-  // Check if meeting exists
-  const meeting = await Meeting.findById(meetingId)
-    .populate('candidate', 'name email phone')
-    .populate('interviewer', 'name email');
+  // Check if meeting exists - handle both ObjectId and roomId
+  let meeting;
+  if (mongoose.Types.ObjectId.isValid(meetingId)) {
+    meeting = await Meeting.findById(meetingId)
+      .populate('candidate', 'name email phone')
+      .populate('interviewer', 'name email');
+  }
+
+  // If not found by _id, try finding by roomId
+  if (!meeting) {
+    meeting = await Meeting.findOne({ roomId: meetingId })
+      .populate('candidate', 'name email phone')
+      .populate('interviewer', 'name email');
+  }
 
   if (!meeting) {
     throw new ApiError(404, 'Meeting not found');
   }
 
+  // Use the actual meeting ObjectId for InterviewAnalysis queries
+  const actualMeetingId = meeting._id;
+
   // Get or create interview result
-  let result = await InterviewResult.findOne({ meeting: meetingId })
+  let result = await InterviewAnalysis.findOne({ meeting: actualMeetingId })
     .populate(
       'questionResults.question',
       'title questionNumber difficulty category'
@@ -28,8 +42,8 @@ export const getInterviewResult = asyncHandler(async (req, res) => {
     .populate('finalizedBy', 'name email');
 
   if (!result) {
-    result = await InterviewResult.create({
-      meeting: meetingId,
+    result = await InterviewAnalysis.create({
+      meeting: actualMeetingId,
       candidate: meeting.candidate._id,
       interviewer: meeting.interviewer?._id,
     });
@@ -65,7 +79,7 @@ export const updateEvaluation = asyncHandler(async (req, res) => {
     attitudeScore,
   } = req.body;
 
-  const result = await InterviewResult.findById(resultId);
+  const result = await InterviewAnalysis.findById(resultId);
 
   if (!result) {
     throw new ApiError(404, 'Interview result not found');
@@ -96,7 +110,7 @@ export const updateEvaluation = asyncHandler(async (req, res) => {
 
 export const updateFinalResult = asyncHandler(async (req, res) => {
   const { resultId } = req.params;
-  const { result: finalResult, resultReason } = req.body;
+  const { result: finalResult, resultReason, attended } = req.body;
 
   const validResults = [
     'pending',
@@ -115,7 +129,7 @@ export const updateFinalResult = asyncHandler(async (req, res) => {
     );
   }
 
-  const interviewResult = await InterviewResult.findById(resultId);
+  const interviewResult = await InterviewAnalysis.findById(resultId);
 
   if (!interviewResult) {
     throw new ApiError(404, 'Interview result not found');
@@ -123,28 +137,18 @@ export const updateFinalResult = asyncHandler(async (req, res) => {
 
   interviewResult.result = finalResult;
   interviewResult.resultReason = resultReason;
+  if (attended !== undefined) {
+    interviewResult.attended = attended;
+  }
   interviewResult.isFinalized = true;
   interviewResult.finalizedAt = new Date();
   interviewResult.finalizedBy = req.user.id;
 
   await interviewResult.save();
 
-  // Also update the meeting result
+  // Update the meeting status only (evaluation is now in InterviewAnalysis)
   await Meeting.findByIdAndUpdate(interviewResult.meeting, {
-    result:
-      finalResult === 'pass'
-        ? 'pass'
-        : finalResult === 'fail'
-          ? 'fail'
-          : 'pending',
-    'evaluation.result':
-      finalResult === 'pass'
-        ? 'selected'
-        : finalResult === 'fail'
-          ? 'rejected'
-          : finalResult === 'on_hold'
-            ? 'on-hold'
-            : 'pending',
+    status: 'completed',
   });
 
   res
@@ -165,7 +169,7 @@ export const addFeedback = asyncHandler(async (req, res) => {
     hiringDecision,
   } = req.body;
 
-  const result = await InterviewResult.findById(resultId);
+  const result = await InterviewAnalysis.findById(resultId);
 
   if (!result) {
     throw new ApiError(404, 'Interview result not found');
@@ -196,7 +200,7 @@ export const updateQuestionRating = asyncHandler(async (req, res) => {
     approachRating,
   } = req.body;
 
-  const result = await InterviewResult.findById(resultId);
+  const result = await InterviewAnalysis.findById(resultId);
 
   if (!result) {
     throw new ApiError(404, 'Interview result not found');
@@ -232,7 +236,7 @@ export const updateIntegrityFlags = asyncHandler(async (req, res) => {
     notes,
   } = req.body;
 
-  const result = await InterviewResult.findById(resultId);
+  const result = await InterviewAnalysis.findById(resultId);
 
   if (!result) {
     throw new ApiError(404, 'Interview result not found');
@@ -259,7 +263,7 @@ export const updateIntegrityFlags = asyncHandler(async (req, res) => {
 export const getCandidateResults = asyncHandler(async (req, res) => {
   const { candidateId } = req.params;
 
-  const results = await InterviewResult.find({ candidate: candidateId })
+  const results = await InterviewAnalysis.find({ candidate: candidateId })
     .populate('meeting', 'scheduledDate status interviewConfig')
     .populate('interviewer', 'name email')
     .sort({ createdAt: -1 });
@@ -296,14 +300,14 @@ export const getAllResults = asyncHandler(async (req, res) => {
   const skip = (parseInt(page) - 1) * parseInt(limit);
 
   const [results, total] = await Promise.all([
-    InterviewResult.find(query)
-      .populate('candidate', 'name email')
-      .populate('meeting', 'scheduledDate status')
-      .populate('interviewer', 'name')
+    InterviewAnalysis.find(query)
+      .populate('candidate', 'name email phone position photo')
+      .populate('meeting', 'scheduledDate status interviewConfig roomId')
+      .populate('interviewer', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit)),
-    InterviewResult.countDocuments(query),
+    InterviewAnalysis.countDocuments(query),
   ]);
 
   res.status(200).json(
@@ -326,11 +330,11 @@ export const getAllResults = asyncHandler(async (req, res) => {
 export const getDashboardStats = asyncHandler(async (req, res) => {
   const [totalResults, resultsByStatus, avgScores, recentResults] =
     await Promise.all([
-      InterviewResult.countDocuments(),
-      InterviewResult.aggregate([
+      InterviewAnalysis.countDocuments(),
+      InterviewAnalysis.aggregate([
         { $group: { _id: '$result', count: { $sum: 1 } } },
       ]),
-      InterviewResult.aggregate([
+      InterviewAnalysis.aggregate([
         { $match: { 'codingScore.percentage': { $gt: 0 } } },
         {
           $group: {
@@ -340,7 +344,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
           },
         },
       ]),
-      InterviewResult.find()
+      InterviewAnalysis.find()
         .populate('candidate', 'name')
         .populate('meeting', 'scheduledDate')
         .sort({ createdAt: -1 })
@@ -377,7 +381,7 @@ export const getDashboardStats = asyncHandler(async (req, res) => {
 });
 
 export default {
-  getInterviewResult,
+  getInterviewAnalysis,
   updateEvaluation,
   updateFinalResult,
   addFeedback,

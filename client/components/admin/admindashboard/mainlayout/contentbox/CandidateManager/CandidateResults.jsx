@@ -39,26 +39,86 @@ const CandidateResults = ({ candidates, meetings, onViewCandidate }) => {
     try {
       const token = localStorage.getItem('token');
       
-      // Get completed meetings with their results
-      const completedMeetings = meetings.filter(
-        (m) => m.status === 'completed' || m.result !== 'pending'
-      );
+      // Fetch all interview results from the API
+      const response = await axios.get(`${API_URL}/interview-results`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      // Enhance meetings with candidate data
-      const resultsData = completedMeetings.map((meeting) => {
-        const candidate = candidates.find(
-          (c) => c._id === meeting.candidate?._id || c._id === meeting.candidate
+      // Handle different response structures
+      let interviewResults = [];
+      if (response.data?.data?.results) {
+        interviewResults = response.data.data.results;
+      } else if (Array.isArray(response.data?.data)) {
+        interviewResults = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        interviewResults = response.data;
+      }
+
+      // Enhance results with candidate data - use populated data from API
+      const resultsData = interviewResults.map((result) => {
+        // Use populated data from API response directly
+        const candidateFromResult = result.candidate;
+        const meetingFromResult = result.meeting;
+
+        // Fallback to local data if API didn't populate
+        const candidate = candidateFromResult || candidates.find(
+          (c) => c._id === result.candidate
         );
-        
+        const meeting = meetingFromResult || meetings.find(
+          (m) => m._id === result.meeting
+        );
+
         return {
-          ...meeting,
-          candidateData: candidate || meeting.candidate,
+          ...result,
+          candidateData: candidate,
+          meetingData: meeting,
+          // Map InterviewAnalysis fields to display format
+          scheduledDate: meeting?.scheduledDate || result.createdAt,
+          interviewConfig: meeting?.interviewConfig,
+          evaluation: {
+            overallRating: result.overallEvaluation?.overallRating,
+            technicalScore: result.overallEvaluation?.technicalScore,
+            communicationScore: result.overallEvaluation?.communicationScore,
+            problemSolvingScore: result.overallEvaluation?.problemSolvingScore,
+            codeQualityScore: result.overallEvaluation?.codeQualityScore,
+            attitudeScore: result.overallEvaluation?.attitudeScore,
+            result: result.result,
+            feedback: result.feedback?.overallComment,
+            strengths: result.feedback?.strengths || [],
+            improvements: result.feedback?.weaknesses || [],
+          },
+          rating: result.overallEvaluation?.overallRating,
+          // Attended status
+          attended: result.attended !== undefined ? result.attended : (meeting?.attended !== false),
+          // Integrity flags for cheating detection
+          cheatingDetected: result.integrityFlags?.suspiciousActivity || false,
+          cheatingDetails: result.integrityFlags?.notes || '',
+          tabSwitchCount: result.integrityFlags?.tabSwitchCount || 0,
+          copyPasteDetected: result.integrityFlags?.copyPasteDetected || false,
+          // Result reason
+          resultReason: result.resultReason || '',
+          // Coding score
+          codingScore: result.codingScore,
         };
       });
 
       setResults(resultsData);
     } catch (err) {
       console.error('Failed to fetch results:', err);
+      // Fallback to meeting data if API fails
+      const completedMeetings = meetings.filter(
+        (m) => m.status === 'completed' || m.result !== 'pending'
+      );
+      const resultsData = completedMeetings.map((meeting) => {
+        const candidate = candidates.find(
+          (c) => c._id === meeting.candidate?._id || c._id === meeting.candidate
+        );
+        return {
+          ...meeting,
+          candidateData: candidate || meeting.candidate,
+        };
+      });
+      setResults(resultsData);
     } finally {
       setLoading(false);
     }
@@ -270,19 +330,75 @@ const CandidateResults = ({ candidates, meetings, onViewCandidate }) => {
                       {result.interviewConfig?.round || 'N/A'}
                     </span>
                   </div>
-                  {result.cheatingDetected && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Job Role</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {result.interviewConfig?.jobRole || 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Attended</span>
+                    <span className={`text-sm font-semibold ${result.attended ? 'text-green-600' : 'text-red-600'}`}>
+                      {result.attended ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Integrity / Proctoring Section */}
+              <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-5">
+                <div className="flex items-center gap-3 mb-4 pb-3 border-b border-dashed border-gray-100">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center border-2 border-dashed ${result.cheatingDetected ? 'bg-red-50 border-red-200' : 'bg-green-50 border-green-200'}`}>
+                    <FaExclamationTriangle className={result.cheatingDetected ? 'text-red-600' : 'text-green-600'} size={14} />
+                  </div>
+                  <h3 className="font-semibold text-gray-900">Integrity Check</h3>
+                </div>
+                <div className="space-y-3">
+                  {/* Cheating Status */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Suspicious Activity</span>
+                    <span className={`text-sm font-semibold ${result.cheatingDetected ? 'text-red-600' : 'text-green-600'}`}>
+                      {result.cheatingDetected ? 'Detected' : 'None'}
+                    </span>
+                  </div>
+                  {/* Tab Switches */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Tab Switches</span>
+                    <span className={`text-sm font-medium ${result.tabSwitchCount > 3 ? 'text-red-600' : result.tabSwitchCount > 0 ? 'text-yellow-600' : 'text-gray-900'}`}>
+                      {result.tabSwitchCount || 0}
+                    </span>
+                  </div>
+                  {/* Copy Paste */}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-500">Copy/Paste Detected</span>
+                    <span className={`text-sm font-medium ${result.copyPasteDetected ? 'text-red-600' : 'text-green-600'}`}>
+                      {result.copyPasteDetected ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  {/* Cheating Details */}
+                  {result.cheatingDetected && result.cheatingDetails && (
                     <div className="mt-3 p-3 bg-red-50 rounded-lg border border-dashed border-red-200">
-                      <div className="flex items-center gap-2 text-red-700">
-                        <FaExclamationTriangle size={12} />
-                        <span className="text-sm font-medium">Cheating Detected</span>
-                      </div>
-                      {result.cheatingDetails && (
-                        <p className="text-xs text-red-600 mt-1">{result.cheatingDetails}</p>
-                      )}
+                      <p className="text-xs text-red-700 font-medium mb-1">Details:</p>
+                      <p className="text-xs text-red-600">{result.cheatingDetails}</p>
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Result Reason */}
+              {result.resultReason && (
+                <div className="bg-white rounded-xl border-2 border-dashed border-gray-200 p-5">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-9 h-9 bg-orange-50 rounded-lg flex items-center justify-center border-2 border-dashed border-orange-200">
+                      <FaComments className="text-orange-600" size={14} />
+                    </div>
+                    <h3 className="font-semibold text-gray-900">Result Reason</h3>
+                  </div>
+                  <p className="text-sm text-gray-700 bg-gray-50 rounded-lg p-3 border border-dashed border-gray-200">
+                    {result.resultReason}
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Right Column - Scores */}

@@ -95,20 +95,81 @@ const AdminEndMeeting = () => {
     setSuccess('');
     try {
       const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+
+      // Get the fail reason label if exists
+      const failReasonLabel = form.failReason 
+        ? failReasons.find(r => r.id === form.failReason)?.label || form.failReason
+        : '';
+
+      // Step 1: Update meeting status only (evaluation data removed from Meeting)
       await axios.patch(
         `http://localhost:5000/api/meeting/${id}`,
         {
-          ...form,
           status: 'completed',
+          attended: form.attended,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers }
       );
+
+      // Step 2: Get or create InterviewAnalysis and update evaluation
+      const analysisRes = await axios.get(
+        `http://localhost:5000/api/interview-results/meeting/${id}`,
+        { headers }
+      );
+
+      const analysisId = analysisRes.data.data.result._id;
+
+      // Step 3: Update evaluation in InterviewAnalysis
+      await axios.patch(
+        `http://localhost:5000/api/interview-results/${analysisId}/evaluation`,
+        {
+          technicalScore: form.rating,
+          communicationScore: form.rating,
+          problemSolvingScore: form.rating,
+        },
+        { headers }
+      );
+
+      // Step 4: Update final result with proper reason
+      await axios.patch(
+        `http://localhost:5000/api/interview-results/${analysisId}/result`,
+        {
+          result: form.result,
+          resultReason: form.result === 'fail' ? failReasonLabel : form.review,
+          attended: form.attended,
+        },
+        { headers }
+      );
+
+      // Step 5: Add feedback
+      await axios.patch(
+        `http://localhost:5000/api/interview-results/${analysisId}/feedback`,
+        {
+          overallComment: form.review,
+          strengths: form.result === 'pass' ? ['Interview completed successfully'] : [],
+          weaknesses: form.result === 'fail' && failReasonLabel ? [failReasonLabel] : [],
+        },
+        { headers }
+      );
+
+      // Step 6: Update integrity flags if cheating detected
+      if (form.cheatingDetected) {
+        await axios.patch(
+          `http://localhost:5000/api/interview-results/${analysisId}/integrity`,
+          {
+            suspiciousActivity: true,
+            notes: form.cheatingDetails,
+          },
+          { headers }
+        );
+      }
+
       setSuccess('Interview evaluation saved successfully!');
       setTimeout(() => navigate('/dashboard'), 2500);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update meeting');
+      console.error('Error saving evaluation:', err);
+      setError(err.response?.data?.message || 'Failed to save evaluation');
     }
     setUpdateLoading(false);
   };

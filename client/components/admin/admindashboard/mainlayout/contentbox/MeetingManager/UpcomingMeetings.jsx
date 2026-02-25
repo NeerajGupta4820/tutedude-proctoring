@@ -407,14 +407,14 @@ const UpcomingMeetings = ({ meetings, navigate }) => {
                       {/* User Info */}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <div className="w-11 h-11 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-semibold border-2 border-dashed border-blue-200 flex-shrink-0">
-                          {m.user?.name?.charAt(0).toUpperCase() || 'U'}
+                          {m.candidate?.name?.charAt(0).toUpperCase() || 'C'}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="font-semibold text-gray-900 text-sm truncate">
-                            {m.user?.name}
+                            {m.candidate?.name || 'Unknown Candidate'}
                           </div>
                           <div className="text-xs text-gray-500 truncate">
-                            {m.user?.email}
+                            {m.candidate?.email}
                           </div>
                         </div>
                       </div>
@@ -525,14 +525,14 @@ const UpcomingMeetings = ({ meetings, navigate }) => {
                     {/* Header */}
                     <div className="flex items-start gap-3 mb-4 pb-4 border-b border-dashed border-gray-100">
                       <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-semibold text-lg border-2 border-dashed border-blue-200 flex-shrink-0">
-                        {m.user?.name?.charAt(0).toUpperCase() || 'U'}
+                        {m.candidate?.name?.charAt(0).toUpperCase() || 'C'}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="font-semibold text-gray-900 truncate">
-                          {m.user?.name}
+                          {m.candidate?.name || 'Unknown Candidate'}
                         </div>
                         <div className="text-xs text-gray-500 truncate">
-                          {m.user?.email}
+                          {m.candidate?.email}
                         </div>
                       </div>
                       <span
