@@ -14,6 +14,7 @@ import CandidateProfile from './CandidateManager/CandidateProfile';
 import CandidateResults from './CandidateManager/CandidateResults';
 import InterviewerManagement from './InterviewerManagement';
 import SettingsPanel from '../../SettingsPanel';
+import AIChatbot from './AIChatbot/AIChatbot';
 
 const ContentBox = ({
   activeTab,
@@ -193,6 +194,11 @@ const ContentBox = ({
       {/* Settings */}
       {activeTab === 'settings' && (
         <SettingsPanel />
+      )}
+
+      {/* AI Chatbot */}
+      {activeTab === 'ai-chatbot' && (
+        <AIChatbot />
       )}
     </div>
   );

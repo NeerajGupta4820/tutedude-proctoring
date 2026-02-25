@@ -16,6 +16,7 @@ import {
   FaChevronRight,
   FaChevronDown,
   FaChartLine,
+  FaRobot,
 } from 'react-icons/fa';
 import { HiSparkles, HiLightningBolt } from 'react-icons/hi';
 import { AuthContext } from '../../AuthContext';
@@ -79,6 +80,13 @@ const Sidebar = ({
         { id: 'create-candidate', label: 'Add Candidate', icon: FaUserPlus, highlight: true },
         { id: 'results', label: 'Results', icon: FaChartLine },
       ],
+    },
+    {
+      id: 'ai-chatbot',
+      label: 'AI Assistant',
+      icon: FaRobot,
+      type: 'single',
+      gradient: 'from-purple-500 to-indigo-600',
     },
     {
       id: 'settings',
