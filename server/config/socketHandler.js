@@ -8,6 +8,7 @@ import {
   setupQuestionHandlers,
   cleanupQuestionRoom,
 } from './sockethandler/questionHandler.js';
+import { setupAIHandlers } from './sockethandler/aiHandler.js';
 const interviewRooms = {};
 const pendingIceCandidates = {};
 const typingUsers = {};
@@ -17,7 +18,7 @@ export const setupSocketHandlers = (io) => {
     // Setup handlers
     setupWhiteboardHandlers(io, socket);
     setupQuestionHandlers(io, socket);
-
+    setupAIHandlers(io, socket);
     // ========================================
     // ROOM MANAGEMENT EVENTS
     // ========================================

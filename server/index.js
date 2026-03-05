@@ -16,6 +16,7 @@ import questionRoutes from './routes/questionRoutes.js';
 import codeRoutes from './routes/codeRoutes.js';
 import interviewResultRoutes from './routes/interviewResultRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import aiChatRoutes from './routes/aiChatRoutes.js';
 import themeRoutes from './routes/themeRoutes.js';
 import connectDB from './db/dbconfig.js';
 
@@ -42,6 +43,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/candidate', candidateRoutes);
 app.use('/api/interviewer', interviewerRoutes);
+app.use('/api/ai-chat', aiChatRoutes);
 app.use('/api/meeting', meetingRoutes);
 app.use('/api/question', questionRoutes);
 app.use('/api/log', logRoutes);

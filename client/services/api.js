@@ -470,6 +470,82 @@ export const chatApi = {
 };
 
 // ========================
+// AI Chat API (/api/ai-chat) ✅ NEW
+// ========================
+export const aiChatApi = {
+  // Conversation CRUD
+  getConversations: async (page = 1, limit = 20) => {
+    const response = await apiClient.get('/ai-chat/conversations', {
+      params: { page, limit },
+    });
+    return response.data;
+  },
+
+  createConversation: async (title = 'New Conversation') => {
+    const response = await apiClient.post('/ai-chat/conversations', { title });
+    return response.data;
+  },
+
+  searchConversations: async (query, page = 1, limit = 20) => {
+    const response = await apiClient.get('/ai-chat/conversations/search', {
+      params: { q: query, page, limit },
+    });
+    return response.data;
+  },
+
+  updateTitle: async (conversationId, title) => {
+    const response = await apiClient.patch(
+      `/ai-chat/conversations/${conversationId}/title`,
+      { title }
+    );
+    return response.data;
+  },
+
+  togglePin: async (conversationId) => {
+    const response = await apiClient.patch(
+      `/ai-chat/conversations/${conversationId}/pin`
+    );
+    return response.data;
+  },
+
+  deleteConversation: async (conversationId) => {
+    const response = await apiClient.delete(
+      `/ai-chat/conversations/${conversationId}`
+    );
+    return response.data;
+  },
+
+  clearConversation: async (conversationId) => {
+    const response = await apiClient.delete(
+      `/ai-chat/conversations/${conversationId}/clear`
+    );
+    return response.data;
+  },
+
+  // Messages
+  getMessages: async (conversationId, page = 1, limit = 50) => {
+    const response = await apiClient.get(
+      `/ai-chat/conversations/${conversationId}/messages`,
+      { params: { page, limit } }
+    );
+    return response.data;
+  },
+
+  deleteMessage: async (messageId) => {
+    const response = await apiClient.delete(`/ai-chat/messages/${messageId}`);
+    return response.data;
+  },
+
+  addFeedback: async (messageId, type, comment = '') => {
+    const response = await apiClient.patch(
+      `/ai-chat/messages/${messageId}/feedback`,
+      { type, comment }
+    );
+    return response.data;
+  },
+};
+
+// ========================
 // Log API (/api/log)
 // ========================
 export const logApi = {
@@ -499,6 +575,7 @@ export default {
   code: codeApi,
   interviewResult: interviewResultApi,
   chat: chatApi,
+  aiChat: aiChatApi, // ✅ NEW
   log: logApi,
   report: reportApi,
 };
