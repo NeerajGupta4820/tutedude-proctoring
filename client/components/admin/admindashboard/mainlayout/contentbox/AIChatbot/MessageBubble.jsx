@@ -24,13 +24,13 @@ const MessageBubble = ({ message }) => {
 
   return (
     <div
-      className={`flex gap-3 ${
+      className={`flex gap-4 ${
         isUser ? 'flex-row-reverse' : 'flex-row'
       } animate-fadeIn`}
     >
       {/* Avatar */}
       <div
-        className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm ${
+        className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 shadow-md ${
           isUser
             ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
             : message.isError
@@ -39,28 +39,28 @@ const MessageBubble = ({ message }) => {
         }`}
       >
         {isUser ? (
-          <FaUser className="text-white text-xs" />
+          <FaUser className="text-white text-sm" />
         ) : (
-          <FaRobot className="text-white text-xs" />
+          <FaRobot className="text-white text-sm" />
         )}
       </div>
 
       {/* Bubble */}
       <div
-        className={`max-w-[75%] rounded-2xl px-4 py-3 shadow-sm ${
+        className={`max-w-[75%] rounded-2xl px-5 py-3 shadow-md border-2 ${
           isUser
-            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-tr-md'
+            ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-tr-lg border-blue-600'
             : message.isError
-              ? 'bg-red-50 text-red-700 border border-red-200 rounded-tl-md'
-              : 'bg-white text-slate-700 border border-slate-100 rounded-tl-md'
+              ? 'bg-red-50 text-red-700 border-dashed border-red-200 rounded-tl-lg'
+              : 'bg-white text-gray-800 border-dashed border-gray-200 rounded-tl-lg'
         }`}
       >
-        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+        <div className="text-sm leading-relaxed whitespace-pre-wrap font-medium">
           {formatContent(message.content)}
         </div>
         <div
-          className={`text-[10px] mt-2 ${
-            isUser ? 'text-blue-100' : 'text-slate-400'
+          className={`text-[11px] mt-2.5 font-medium ${
+            isUser ? 'text-blue-100' : 'text-gray-400'
           }`}
         >
           {formatTime(message.timestamp)}
